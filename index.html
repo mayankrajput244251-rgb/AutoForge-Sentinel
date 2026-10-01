@@ -1,0 +1,2366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AutoForge Sentinel — Smart Downtime Prediction Twin</title>
+  <meta name="description" content="Interactive smart production-line digital twin with live motor and conveyor simulation, AI quality control and downtime prediction.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23100d09'/%3E%3Cpath d='M32 10 51 21v22L32 54 13 43V21z' fill='none' stroke='%23ff8426' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%23d9ff61'/%3E%3Cpath d='M32 13v8M32 43v8M15 32h8M41 32h8' stroke='%23ffd166' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+  <style>
+    :root {
+      --ink: #e9f5fb;
+      --muted: #91a9b6;
+      --deep: #060d15;
+      --ground: #091723;
+      --panel: rgba(10, 29, 42, .92);
+      --panel-solid: #0b202f;
+      --line: rgba(169, 211, 232, .14);
+      --teal: #5ce4ca;
+      --blue: #73a9ff;
+      --amber: #ffbd59;
+      --red: #ff6974;
+      --green: #48d693;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .35);
+    }
+    * { box-sizing: border-box; }
+    html { background: var(--deep); }
+    body {
+      margin: 0; min-width: 320px; color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background:
+        radial-gradient(circle at 84% 0%, rgba(38, 94, 121, .25), transparent 30rem),
+        radial-gradient(circle at 0% 10%, rgba(48, 74, 139, .20), transparent 31rem),
+        var(--deep);
+    }
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    .app { max-width: 1510px; margin: 0 auto; padding: 1rem clamp(.7rem, 2.3vw, 2rem) 2rem; }
+    .topbar {
+      display: flex; justify-content: space-between; gap: 1rem; align-items: center;
+      padding: .55rem 0 1rem; border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: .75rem; }
+    .brand-mark {
+      width: 2.65rem; height: 2.65rem; display: grid; place-items: center; border-radius: .78rem;
+      background: linear-gradient(140deg, #5ce4ca, #6d80ff); color: #051422; box-shadow: 0 13px 38px rgba(88, 190, 234, .25);
+    }
+    .brand-mark svg { width: 1.55rem; height: 1.55rem; }
+    h1 { margin: 0; font-size: clamp(1.05rem, 2vw, 1.38rem); letter-spacing: -.03em; }
+    .brand p { margin: .1rem 0 0; color: var(--muted); font-size: .75rem; }
+    .top-actions { display: flex; gap: .55rem; align-items: center; }
+    .chip, .head-status {
+      display: inline-flex; align-items: center; gap: .42rem; white-space: nowrap; border-radius: 999px;
+      font-weight: 850; font-size: .75rem; letter-spacing: .07em; padding: .43rem .62rem; border: 1px solid var(--line);
+    }
+    .chip { background: rgba(92,228,202,.08); color: #b8fff1; }
+    .chip i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--teal); animation: blink 1.6s infinite; }
+    @keyframes blink { 50% { opacity: .45; } }
+    .small-action {
+      color: var(--ink); border: 1px solid var(--line); border-radius: .64rem; background: #10293a;
+      padding: .48rem .62rem; font-size: .75rem; font-weight: 750; transition: .15s ease;
+    }
+    .small-action:hover, .control-button:hover, .fault:hover { filter: brightness(1.13); transform: translateY(-1px); }
+    .hero { display: flex; justify-content: space-between; align-items: end; gap: 1rem; padding: 1rem 0 .85rem; }
+    .eyebrow { margin: 0 0 .3rem; color: #97bed1; font-size: .75rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
+    .hero h2 { margin: 0; font-size: clamp(1.1rem, 2.5vw, 1.48rem); letter-spacing: -.035em; }
+    .hero p:not(.eyebrow) { margin: .32rem 0 0; color: var(--muted); font-size: .8rem; }
+    .head-status { color: #b9ffdc; background: rgba(72,214,147,.10); border-color: rgba(72,214,147,.32); }
+    .head-status i { width: .46rem; height: .46rem; border-radius: 50%; background: currentColor; }
+    .main-grid { display: grid; grid-template-columns: minmax(0, 1.65fr) 19rem; gap: .9rem; align-items: start; }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 1rem; box-shadow: var(--shadow); }
+    .machine-panel { overflow: hidden; position: relative; }
+    .machine-bar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .85rem 1rem; border-bottom: 1px solid var(--line); background: rgba(9, 27, 40, .86); }
+    .machine-title { display: flex; align-items: center; gap: .55rem; min-width: 0; }
+    .machine-title h3 { margin: 0; font-size: .91rem; }
+    .machine-title span { color: var(--muted); font-size: .7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .live-dot { width: .55rem; height: .55rem; background: var(--green); border-radius: 50%; box-shadow: 0 0 0 .32rem rgba(72,214,147,.09); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 50% { transform: scale(.72); opacity: .65; } }
+    .machine-state { display: inline-flex; gap: .35rem; align-items: center; color: #b3d5e7; font-size: .75rem; font-weight: 800; white-space: nowrap; }
+    .machine-state b { color: var(--teal); }
+    .canvas-wrap { position: relative; background: linear-gradient(180deg, #06131f, #0a1f2e); }
+    #factoryCanvas { display: block; width: 100%; height: min(48vw, 490px); min-height: 335px; }
+    .canvas-badge { position: absolute; top: .8rem; left: .85rem; color: #b2d9e9; font-size: .75rem; font-weight: 800; letter-spacing: .09em; padding: .36rem .5rem; border: 1px solid rgba(165,210,230,.16); border-radius: .45rem; background: rgba(3,15,25,.58); }
+    .canvas-legend { position: absolute; right: .85rem; bottom: .7rem; display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; }
+    .canvas-legend span { color: #c7e1ed; background: rgba(3,15,25,.65); border: 1px solid rgba(165,210,230,.13); padding: .31rem .44rem; border-radius: .4rem; font-size: .75rem; }
+    .status-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--line); }
+    .status-cell { padding: .78rem .9rem; border-right: 1px solid var(--line); }
+    .status-cell:last-child { border-right: 0; }
+    .status-cell p { color: #92b3c5; margin: 0; font-size: .75rem; font-weight: 900; letter-spacing: .08em; }
+    .status-cell strong { display: block; margin-top: .25rem; font-size: .94rem; }
+    .side { padding: .95rem; display: grid; gap: .88rem; }
+    .side h3 { margin: 0; font-size: .91rem; }
+    .controller-card { padding: .82rem; border: 1px solid rgba(172, 214, 234, .12); background: #0a1d2a; border-radius: .78rem; }
+    .controller-head { display: flex; justify-content: space-between; align-items: center; gap: .7rem; }
+    .controller-head h4 { margin: 0; font-size: .78rem; }
+    .autopilot { display: inline-flex; gap: .3rem; align-items: center; color: #b2ffe7; font-size: .75rem; font-weight: 900; letter-spacing: .08em; }
+    .autopilot i { width: .42rem; height: .42rem; border-radius: 50%; background: var(--teal); }
+    .decision { margin-top: .68rem; border-left: 3px solid var(--green); padding-left: .62rem; }
+    .decision b { display: block; font-size: .77rem; }
+    .decision span { display: block; color: var(--muted); font-size: .75rem; line-height: 1.38; margin-top: .17rem; }
+    .confidence-row { display: flex; justify-content: space-between; margin-top: .65rem; color: #a8c7d5; font-size: .75rem; }
+    .meter { height: .38rem; margin-top: .34rem; overflow: hidden; background: #183448; border-radius: 99px; }
+    .meter i { display: block; height: 100%; border-radius: inherit; width: 92%; background: var(--teal); transition: .25s ease; }
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .control-button { border: 0; border-radius: .63rem; min-height: 2.35rem; padding: .45rem .4rem; color: #fff; background: #21465c; font-weight: 850; font-size: .75rem; transition: .15s ease; }
+    .control-button.primary { background: linear-gradient(135deg, #2e93df, #4c70ef); }
+    .control-button.stop { background: #5a2a3a; }
+    .control-button.active { outline: 2px solid rgba(92,228,202,.74); }
+    .speed-row { margin-top: .1rem; }
+    .speed-row label { display: flex; justify-content: space-between; color: #c6e0eb; font-weight: 750; font-size: .75rem; }
+    .speed-row output { color: var(--teal); font-weight: 900; }
+    .speed-row input { width: 100%; margin-top: .35rem; accent-color: var(--blue); }
+    .fault-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+    .fault { text-align: left; border: 1px solid rgba(172, 214, 234, .13); border-radius: .55rem; background: #0b2534; color: #d5e9f2; padding: .53rem; font-size: .75rem; font-weight: 800; transition: .15s ease; }
+    .fault.active { border-color: var(--amber); background: rgba(172,111,31,.16); color: #ffe1ab; }
+    .fault i { width: .4rem; height: .4rem; border-radius: 50%; display: inline-block; margin-right: .32rem; background: var(--green); }
+    .fault.warn i { background: var(--amber); }
+    .fault.bad i { background: var(--red); }
+    .line { border: 0; border-top: 1px solid var(--line); margin: 0; }
+    .lower-grid { display: grid; grid-template-columns: minmax(0, 1.17fr) .83fr; gap: .9rem; margin-top: .9rem; }
+    .analysis, .events { padding: .95rem; }
+    .analysis-head, .events-head { display: flex; align-items: center; justify-content: space-between; gap: .6rem; margin-bottom: .75rem; }
+    .analysis h3, .events h3 { margin: 0; font-size: .9rem; }
+    .algorithm-pill { border: 1px solid rgba(115,169,255,.28); color: #b6d4ff; background: rgba(115,169,255,.08); padding: .27rem .43rem; border-radius: 999px; font-size: .75rem; font-weight: 900; }
+    .sensor-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .55rem; }
+    .sensor-card { padding: .66rem; border-radius: .67rem; border: 1px solid rgba(172,214,234,.1); background: #0a2130; }
+    .sensor-card p { margin: 0; color: #93b6c9; font-size: .6rem; letter-spacing: .06em; font-weight: 900; }
+    .sensor-card strong { display: block; font-size: .91rem; margin-top: .28rem; }
+    .sensor-card span { display: block; color: var(--muted); font-size: .75rem; margin-top: .15rem; }
+    .feature-list { margin-top: .76rem; display: grid; gap: .52rem; }
+    .feature { display: grid; grid-template-columns: 7.1rem 1fr 2.6rem; align-items: center; gap: .55rem; color: #d2e6ee; font-size: .75rem; }
+    .feature label { font-weight: 750; }
+    .feature .track { height: .44rem; border-radius: 999px; overflow: hidden; background: #173548; }
+    .feature .track i { display: block; width: 20%; height: 100%; border-radius: inherit; background: var(--teal); transition: .3s ease; }
+    .feature output { color: #b7d5e2; text-align: right; font-weight: 750; }
+    .event-list { display: grid; gap: .48rem; max-height: 267px; overflow: auto; padding-right: .1rem; }
+    .event { display: grid; grid-template-columns: .46rem 1fr; gap: .48rem; align-items: start; padding: .53rem .58rem; background: #0a2130; border: 1px solid rgba(172,214,234,.1); border-radius: .58rem; }
+    .event i { width: .42rem; height: .42rem; border-radius: 50%; margin-top: .13rem; background: var(--teal); }
+    .event.warn i { background: var(--amber); }
+    .event.bad i { background: var(--red); }
+    .event-time { color: #82a7ba; font-size: .6rem; }
+    .event-text { margin-top: .12rem; color: #d7eaf2; font-size: .75rem; line-height: 1.35; }
+    .ledger { overflow: hidden; margin-top: .9rem; }
+    .ledger-head { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .9rem .95rem; border-bottom: 1px solid var(--line); }
+    .ledger-head h3 { margin: 0; font-size: .92rem; }
+    .ledger-head p { margin-bottom: .2rem; }
+    .ledger-note { color: var(--muted); font-size: .75rem; text-align: right; }
+    .table-wrap { overflow-x: auto; }
+    .packet-table { width: 100%; min-width: 790px; border-collapse: collapse; }
+    .packet-table th, .packet-table td { padding: .68rem .75rem; border-bottom: 1px solid rgba(169,211,232,.1); text-align: left; white-space: nowrap; font-size: .75rem; }
+    .packet-table th { color: #8fb8ca; background: rgba(6,20,31,.52); font-size: .72rem; letter-spacing: .06em; }
+    .packet-table td { color: #d8eaf2; }
+    .packet-table tbody tr:last-child td { border-bottom: 0; }
+    .packet-table tbody tr:hover { background: rgba(89,146,183,.08); }
+    .packet-result { display: inline-flex; border-radius: 999px; padding: .25rem .43rem; font-size: .7rem; font-weight: 900; }
+    .packet-result.good { color: #a9f8d1; background: rgba(72,214,147,.13); }
+    .packet-result.warning { color: #ffe0a4; background: rgba(255,189,89,.14); }
+    .packet-result.reject { color: #ffbac0; background: rgba(255,105,116,.15); }
+    .empty-ledger { color: var(--muted); text-align: center; padding: 1rem !important; }
+    .advanced-grid { display: grid; grid-template-columns: 1.04fr 1.18fr .98fr; gap: .9rem; margin-top: .9rem; }
+    .intelligence, .trend-panel, .maintenance { padding: .95rem; }
+    .intelligence-head, .trend-head, .maintenance-head { display: flex; align-items: center; justify-content: space-between; gap: .65rem; margin-bottom: .78rem; }
+    .intelligence h3, .trend-panel h3, .maintenance h3 { margin: 0; font-size: .91rem; }
+    .oee-layout { display: grid; grid-template-columns: 6.55rem 1fr; gap: .7rem; align-items: center; }
+    .oee-ring { --oee: 100%; width: 6.35rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--teal) var(--oee), #1a3748 0); box-shadow: inset 0 0 0 1px rgba(183,224,240,.12), 0 0 28px rgba(92,228,202,.08); }
+    .oee-ring > div { width: 4.85rem; aspect-ratio: 1; display: grid; place-content: center; text-align: center; border-radius: 50%; background: #0a1e2c; border: 1px solid rgba(172,214,234,.12); }
+    .oee-ring b { display: block; font-size: 1.1rem; }
+    .oee-ring span { display: block; color: #83a8b9; font-size: .6rem; font-weight: 900; letter-spacing: .08em; }
+    .metric-list { display: grid; gap: .48rem; }
+    .metric-line > div { display: flex; align-items: center; justify-content: space-between; gap: .5rem; color: #a9c6d3; font-size: .72rem; }
+    .metric-line b { color: #e4f3f9; font-size: .75rem; }
+    .metric-line > i { display: block; height: .32rem; margin-top: .22rem; overflow: hidden; border-radius: 999px; background: #173548; }
+    .metric-line > i b { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--teal); transition: width .35s ease, background .35s ease; }
+    .forecast-card { margin-top: .8rem; padding: .67rem; border: 1px solid rgba(115,169,255,.18); border-radius: .68rem; background: linear-gradient(135deg, rgba(48,83,140,.19), rgba(10,33,48,.72)); }
+    .forecast-card p, .maintenance-callout p { margin: 0; color: #92b4c6; font-size: .6rem; font-weight: 900; letter-spacing: .07em; }
+    .forecast-card b { display: block; margin-top: .28rem; color: #cce1ff; font-size: .79rem; }
+    .forecast-card span { display: block; margin-top: .18rem; color: var(--muted); font-size: .71rem; line-height: 1.35; }
+    .wide-action { width: 100%; margin-top: .58rem; }
+    .risk-chip { display: inline-flex; align-items: center; border-radius: 999px; padding: .28rem .43rem; font-size: .65rem; font-weight: 900; letter-spacing: .07em; border: 1px solid transparent; white-space: nowrap; }
+    .risk-chip.good { color: #b6ffe1; background: rgba(72,214,147,.11); border-color: rgba(72,214,147,.25); }
+    .risk-chip.warn { color: #ffe2a6; background: rgba(255,189,89,.12); border-color: rgba(255,189,89,.28); }
+    .risk-chip.bad { color: #ffc1c6; background: rgba(255,105,116,.12); border-color: rgba(255,105,116,.28); }
+    .trend-wrap { height: 166px; border: 1px solid rgba(172,214,234,.11); border-radius: .72rem; overflow: hidden; background: linear-gradient(180deg, #081b29, #091522); }
+    #anomalyCanvas { display: block; width: 100%; height: 100%; }
+    .trend-caption { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .55rem; color: #83a9bb; font-size: .7rem; }
+    .trend-caption b { color: #d6edf6; font-size: .74rem; }
+    .health-stack { display: grid; gap: .67rem; }
+    .health-row > div { display: flex; justify-content: space-between; gap: .6rem; color: #aac6d3; font-size: .73rem; }
+    .health-row b { color: #edf8fc; }
+    .health-meter { height: .42rem; margin-top: .27rem; overflow: hidden; border-radius: 99px; background: #183448; }
+    .health-meter i { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--green); transition: width .35s ease, background .35s ease; }
+    .maintenance-callout { margin-top: .8rem; padding: .69rem; border-left: 3px solid var(--teal); border-radius: .2rem .65rem .65rem .2rem; background: #0a2130; }
+    .maintenance-callout b { display: block; margin-top: .28rem; font-size: .77rem; }
+    .maintenance-callout span { display: block; margin-top: .18rem; color: var(--muted); font-size: .71rem; line-height: 1.36; }
+    .downtime-grid { display: grid; grid-template-columns: 1.27fr .96fr .92fr; gap: .9rem; margin-top: .9rem; }
+    .downtime-panel, .cause-panel, .workorder-panel, .future-panel { padding: .95rem; }
+    .downtime-head, .cause-head, .workorder-head, .future-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; margin-bottom: .82rem; }
+    .downtime-panel h3, .cause-panel h3, .workorder-panel h3, .future-panel h3 { margin: 0; font-size: .93rem; }
+    .prediction-shell { display: grid; grid-template-columns: 7.1rem 1fr; gap: .8rem; align-items: center; }
+    .stop-orb { --risk: 8%; position: relative; width: 6.75rem; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: conic-gradient(var(--teal) var(--risk), #193749 0); box-shadow: inset 0 0 0 1px rgba(190,232,246,.12), 0 0 28px rgba(92,228,202,.08); }
+    .stop-orb::after { content: ""; position: absolute; inset: .67rem; border-radius: 50%; background: #09202e; border: 1px solid rgba(190,232,246,.12); }
+    .stop-orb > div { z-index: 1; text-align: center; }
+    .stop-orb b { display: block; font-size: 1.1rem; }
+    .stop-orb span { display: block; margin-top: .12rem; color: #8eadbc; font-size: .56rem; font-weight: 900; letter-spacing: .08em; }
+    .prediction-copy p { margin: 0; color: #8cb1c3; font-size: .62rem; font-weight: 900; letter-spacing: .075em; }
+    .prediction-copy b { display: block; margin-top: .27rem; color: #e6f6fb; font-size: .85rem; line-height: 1.28; }
+    .prediction-copy span { display: block; margin-top: .22rem; color: var(--muted); font-size: .72rem; line-height: 1.4; }
+    .line-map { position: relative; display: grid; grid-template-columns: repeat(5, 1fr); gap: .33rem; margin-top: .9rem; padding: .68rem .24rem .16rem; }
+    .line-map::before { content: ""; position: absolute; z-index: 0; left: 9%; right: 9%; top: 1.5rem; height: 2px; background: linear-gradient(90deg, #40cf92, #5ce4ca, #73a9ff, #ffbd59, #ff6974); opacity: .62; }
+    .twin-node { --node: var(--teal); position: relative; z-index: 1; text-align: center; }
+    .twin-node i { position: relative; display: grid; place-items: center; width: 1.7rem; height: 1.7rem; margin: 0 auto; border: 2px solid var(--node); border-radius: 50%; background: #0c2636; box-shadow: 0 0 0 .25rem rgba(92,228,202,.06), 0 0 15px color-mix(in srgb, var(--node) 45%, transparent); }
+    .twin-node i::after { content: ""; position: absolute; width: .38rem; height: .38rem; border-radius: 50%; background: var(--node); animation: twinPulse 1.45s ease-in-out infinite; }
+    .twin-node b { display: block; margin-top: .42rem; color: #cee5ee; font-size: .61rem; line-height: 1.15; }
+    .twin-node span { display: block; margin-top: .13rem; color: #7ea0b1; font-size: .57rem; }
+    .twin-node.advisory { --node: var(--amber); }
+    .twin-node.critical { --node: var(--red); }
+    @keyframes twinPulse { 50% { transform: scale(.55); opacity: .5; } }
+    .downtime-actions { display: flex; gap: .5rem; margin-top: .83rem; }
+    .downtime-actions .control-button { flex: 1; }
+    .cause-list { display: grid; gap: .48rem; }
+    .cause-row { display: grid; grid-template-columns: 1.7rem 1fr auto; align-items: center; gap: .5rem; padding: .5rem .55rem; border: 1px solid rgba(172,214,234,.1); border-radius: .58rem; background: #0a2130; }
+    .cause-rank { display: grid; place-items: center; width: 1.55rem; height: 1.55rem; border-radius: .42rem; background: rgba(115,169,255,.13); color: #cbe0ff; font-size: .67rem; font-weight: 900; }
+    .cause-row b { display: block; color: #d5eaf2; font-size: .72rem; }
+    .cause-row span { display: block; margin-top: .1rem; color: #819eae; font-size: .62rem; line-height: 1.25; }
+    .cause-row output { color: #bff4e7; font-size: .67rem; font-weight: 900; }
+    .workorder-status { display: flex; align-items: center; gap: .45rem; padding: .58rem; border: 1px solid rgba(115,169,255,.2); border-radius: .6rem; background: rgba(64,99,151,.12); color: #cfe1ff; font-size: .72rem; font-weight: 800; }
+    .workorder-status i { width: .45rem; height: .45rem; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 .22rem rgba(115,169,255,.11); }
+    .workorder-list { display: grid; gap: .46rem; margin-top: .75rem; }
+    .workorder-item { display: flex; justify-content: space-between; gap: .6rem; color: #9fbecc; font-size: .7rem; }
+    .workorder-item b { color: #e1f1f7; font-size: .71rem; text-align: right; }
+    .future-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .5rem; }
+    .future-item { min-height: 5rem; padding: .6rem; border: 1px solid rgba(172,214,234,.1); border-radius: .62rem; background: #0a2130; }
+    .future-item b { display: block; color: #d6edf6; font-size: .71rem; }
+    .future-item span { display: block; margin-top: .2rem; color: #8ba9b8; font-size: .65rem; line-height: 1.32; }
+    .report-card { width: min(650px, 100%); }
+    .report-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; margin: .85rem 0; }
+    .report-tile { padding: .64rem; border: 1px solid rgba(172,214,234,.12); border-radius: .65rem; background: #0a2130; }
+    .report-tile span { display: block; color: #92b5c6; font-size: .6rem; font-weight: 900; letter-spacing: .07em; }
+    .report-tile b { display: block; margin-top: .25rem; color: #eaf8fd; font-size: .91rem; }
+    .report-note { margin: .2rem 0 .95rem; padding: .7rem; border: 1px solid rgba(115,169,255,.18); border-radius: .65rem; color: #c8dde7; background: rgba(25,61,86,.28); font-size: .78rem; line-height: 1.45; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem; margin-top: .9rem; }
+    .flow-step { text-align: center; background: rgba(11,32,47,.78); border: 1px solid var(--line); border-radius: .73rem; padding: .68rem .4rem; }
+    .flow-step b { display: block; font-size: .7rem; }
+    .flow-step span { color: var(--muted); display: block; font-size: .75rem; margin-top: .17rem; }
+    .footnote { color: #718e9f; text-align: center; margin: .8rem 0 .1rem; font-size: .75rem; line-height: 1.42; }
+    .modal { position: fixed; z-index: 10; inset: 0; background: rgba(1,8,14,.76); backdrop-filter: blur(7px); display: none; align-items: center; justify-content: center; padding: 1rem; }
+    .modal.show { display: flex; }
+    .modal-card { width: min(610px, 100%); padding: 1.2rem; background: #0b2130; border: 1px solid rgba(172,214,234,.25); border-radius: 1rem; box-shadow: 0 30px 90px rgba(0,0,0,.45); }
+    .modal-card h2 { margin: 0; font-size: 1.16rem; }
+    .modal-card ol { margin: .8rem 0 1rem; padding-left: 1.17rem; color: #d1e5ef; font-size: .86rem; line-height: 1.58; }
+    .modal-card li + li { margin-top: .4rem; }
+    .modal-actions { display: flex; justify-content: flex-end; }
+    .presentation .side, .presentation .lower-grid, .presentation .flow, .presentation .footnote, .presentation .hero p:not(.eyebrow), .presentation .topbar .small-action:first-of-type { display: none; }
+    .presentation .main-grid { display: block; max-width: 1230px; margin: 0 auto; }
+    .presentation .machine-panel { min-height: calc(100vh - 120px); }
+    .presentation #factoryCanvas { height: min(68vw, 630px); }
+    .presentation .machine-panel { margin-top: .4rem; }
+    @media (max-width: 1080px) {
+      .main-grid { grid-template-columns: minmax(0,1fr) 17rem; }
+      .sensor-grid { grid-template-columns: repeat(2, 1fr); }
+      .lower-grid { grid-template-columns: 1fr; }
+      .advanced-grid { grid-template-columns: 1fr 1fr; }
+      .maintenance { grid-column: 1 / -1; }
+      .downtime-grid { grid-template-columns: 1fr 1fr; }
+      .downtime-panel { grid-column: 1 / -1; }
+      .status-strip { grid-template-columns: repeat(3, 1fr); }
+      .status-cell:nth-child(3n) { border-right: 0; }
+      .status-cell:nth-child(-n+3) { border-bottom: 1px solid var(--line); }
+    }
+    @media (max-width: 820px) {
+      .topbar, .hero { align-items: flex-start; flex-direction: column; }
+      .top-actions { width: 100%; justify-content: space-between; }
+      .main-grid { display: block; }
+      .side { margin-top: .9rem; }
+      .machine-panel { overflow: auto; }
+      #factoryCanvas { height: 380px; min-width: 620px; }
+      .canvas-wrap { overflow-x: auto; }
+    }
+    @media (max-width: 520px) {
+      .app { padding: .75rem; }
+      .chip { display: none; }
+      .top-actions { gap: .35rem; }
+      .small-action { padding: .44rem; font-size: .75rem; }
+      .status-strip { grid-template-columns: 1fr 1fr; }
+      .status-cell:nth-child(3n) { border-right: 1px solid var(--line); }
+      .status-cell:nth-child(2n) { border-right: 0; }
+      .status-cell:nth-child(-n+4) { border-bottom: 1px solid var(--line); }
+      .sensor-grid { grid-template-columns: 1fr 1fr; }
+      .flow { grid-template-columns: repeat(2, 1fr); }
+      .advanced-grid { grid-template-columns: 1fr; }
+      .maintenance { grid-column: auto; }
+      .downtime-grid { grid-template-columns: 1fr; }
+      .downtime-panel { grid-column: auto; }
+      .report-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* Forge Terminal visual redesign: graphite, hot orange, lime and alert red */
+    :root {
+      --ink: #fff1db;
+      --muted: #b9aa90;
+      --deep: #100d09;
+      --ground: #18120c;
+      --panel: rgba(31, 24, 16, .95);
+      --panel-solid: #21170e;
+      --line: rgba(255, 211, 143, .16);
+      --teal: #d9ff61;
+      --blue: #ff8426;
+      --amber: #ffd166;
+      --red: #ff6666;
+      --green: #a7ee57;
+      --shadow: 0 22px 70px rgba(0, 0, 0, .42);
+    }
+    html { background: var(--deep); }
+    body {
+      background:
+        radial-gradient(circle at 83% -4%, rgba(255, 112, 27, .23), transparent 28rem),
+        radial-gradient(circle at 3% 8%, rgba(217, 255, 97, .11), transparent 27rem),
+        linear-gradient(145deg, #100d09, #171009 48%, #0c0a08);
+    }
+    .brand-mark { background: linear-gradient(140deg, #ff8426, #ffd166 56%, #d9ff61); color: #1d1307; box-shadow: 0 13px 38px rgba(255, 132, 38, .26); }
+    .chip { background: rgba(217,255,97,.08); color: #efffc1; border-color: rgba(217,255,97,.28); }
+    .small-action { background: #2a1a0e; border-color: rgba(255,211,143,.2); color: #fff1db; }
+    .small-action.advanced-toggle { border-color: rgba(255,132,38,.45); color: #ffd7a6; }
+    .small-action.advanced-toggle.active { background: linear-gradient(135deg, #ff8426, #e95c2d); border-color: #ffd166; color: #1e1107; box-shadow: 0 8px 22px rgba(255,132,38,.22); }
+    .eyebrow { color: #ffc670; }
+    .panel { background: var(--panel); border-color: var(--line); }
+    .machine-bar { background: rgba(29, 20, 12, .92); }
+    .machine-state { color: #ead8b6; }
+    .canvas-wrap { background: linear-gradient(180deg, #130e09, #21150b); }
+    .canvas-badge { color: #ffe0ad; border-color: rgba(255,190,101,.34); background: rgba(26,16,8,.8); }
+    .canvas-legend span { color: #f5dfbd; background: rgba(25,15,8,.82); border-color: rgba(255,190,101,.2); }
+    .status-cell p, .sensor-card p, .report-tile span { color: #d8b784; }
+    .controller-card, .sensor-card, .event, .cause-row, .future-item, .report-tile, .maintenance-callout { background: #21170e; border-color: rgba(255,211,143,.12); }
+    .decision span, .sensor-card span, .event-text, .ledger-note, .forecast-card span, .maintenance-callout span, .prediction-copy span, .future-item span { color: var(--muted); }
+    .meter, .feature .track, .metric-line > i, .health-meter { background: #3a2916; }
+    .control-button { background: #4a2c16; color: #fff4df; }
+    .control-button.primary { background: linear-gradient(135deg, #ff8426, #e9532d); }
+    .control-button.stop { background: #632b25; }
+    .control-button.active { outline-color: rgba(217,255,97,.78); }
+    .speed-row label { color: #f0d7af; }
+    .speed-row input { accent-color: #ff8426; }
+    .fault { background: #2a1b0e; border-color: rgba(255,211,143,.15); color: #f9e7ca; }
+    .fault.active { border-color: #ffd166; background: rgba(255,132,38,.18); color: #fff0c5; }
+    .algorithm-pill { color: #ffe2b3; background: rgba(255,132,38,.10); border-color: rgba(255,132,38,.3); }
+    .event-time, .trend-caption, .oee-ring span, .prediction-copy p, .stop-orb span { color: #bda789; }
+    .packet-table th { color: #edc990; background: rgba(28,18,10,.76); }
+    .packet-table td { color: #fff0dc; }
+    .packet-table tbody tr:hover { background: rgba(255,132,38,.08); }
+    .oee-ring { background: conic-gradient(var(--teal) var(--oee), #3a2916 0); box-shadow: inset 0 0 0 1px rgba(255,221,164,.13), 0 0 28px rgba(217,255,97,.08); }
+    .oee-ring > div, .stop-orb::after { background: #21170e; border-color: rgba(255,221,164,.13); }
+    .forecast-card { border-color: rgba(255,132,38,.28); background: linear-gradient(135deg, rgba(94,49,17,.42), rgba(33,23,14,.92)); }
+    .forecast-card b { color: #ffe2ac; }
+    .risk-chip.good { color: #efffc1; background: rgba(217,255,97,.1); border-color: rgba(217,255,97,.27); }
+    .risk-chip.warn { color: #ffe5a9; background: rgba(255,209,102,.12); border-color: rgba(255,209,102,.3); }
+    .risk-chip.bad { color: #ffc7c0; background: rgba(255,102,102,.12); border-color: rgba(255,102,102,.32); }
+    .trend-wrap { border-color: rgba(255,211,143,.12); background: linear-gradient(180deg, #22170e, #140e09); }
+    .health-row > div, .metric-line > div { color: #ead5b1; }
+    .metric-line b, .health-row b, .oee-ring b { color: #fff4df; }
+    .downtime-panel, .cause-panel, .workorder-panel, .future-panel { background: var(--panel); }
+    .stop-orb { background: conic-gradient(var(--teal) var(--risk), #3a2916 0); box-shadow: inset 0 0 0 1px rgba(255,221,164,.13), 0 0 28px rgba(217,255,97,.08); }
+    .line-map::before { background: linear-gradient(90deg, #a7ee57, #d9ff61, #ff8426, #ffd166, #ff6666); }
+    .twin-node i { background: #21170e; box-shadow: 0 0 0 .25rem rgba(217,255,97,.06), 0 0 15px color-mix(in srgb, var(--node) 45%, transparent); }
+    .twin-node b, .cause-row b, .future-item b { color: #fff0da; }
+    .twin-node span, .cause-row span { color: #b9a78b; }
+    .cause-rank { background: rgba(255,132,38,.15); color: #ffe2b3; }
+    .workorder-status { border-color: rgba(255,132,38,.28); background: rgba(103,53,17,.28); color: #ffe0ae; }
+    .workorder-status i { background: #ff8426; box-shadow: 0 0 0 .22rem rgba(255,132,38,.14); }
+    .workorder-item { color: #cbb89a; }
+    .workorder-item b { color: #fff0da; }
+    .flow-step { background: rgba(33,23,14,.88); }
+    .footnote { color: #a99273; }
+    .modal { background: rgba(13,9,5,.8); }
+    .modal-card { background: #21170e; border-color: rgba(255,211,143,.26); }
+    .modal-card ol { color: #f1ddba; }
+    .report-note { border-color: rgba(255,132,38,.25); background: rgba(103,53,17,.22); color: #f0d9b5; }
+    .advanced-active .machine-panel { box-shadow: 0 0 0 1px rgba(255,132,38,.24), 0 24px 72px rgba(0,0,0,.5); }
+    .advanced-active .canvas-badge::after { content: " · ADVANCED"; color: #d9ff61; }
+    .backend-chip { border-color: rgba(255,132,38,.34); background: rgba(255,132,38,.09); color: #ffe0ae; }
+    .backend-chip i { background: #ffd166; }
+    .backend-chip.online { border-color: rgba(217,255,97,.34); background: rgba(217,255,97,.09); color: #efffc1; }
+    .backend-chip.online i { background: #d9ff61; }
+    .backend-chip.error { border-color: rgba(255,102,102,.42); background: rgba(255,102,102,.1); color: #ffd2cc; }
+    .backend-chip.error i { background: #ff6666; animation: none; }
+    .backend-panel { margin-top: .9rem; padding: .95rem; }
+    .backend-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; }
+    .backend-head h3 { margin: 0; font-size: .93rem; }
+    .backend-badge { border-radius: 999px; padding: .3rem .46rem; color: #ffe4b2; background: rgba(255,132,38,.1); border: 1px solid rgba(255,132,38,.28); font-size: .67rem; font-weight: 900; letter-spacing: .06em; white-space: nowrap; }
+    .backend-badge.online { color: #efffc1; background: rgba(217,255,97,.1); border-color: rgba(217,255,97,.3); }
+    .backend-badge.error { color: #ffd0cb; background: rgba(255,102,102,.1); border-color: rgba(255,102,102,.33); }
+    .backend-data-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .58rem; margin-top: .78rem; }
+    .backend-data { min-height: 4.2rem; padding: .63rem; border: 1px solid rgba(255,211,143,.12); border-radius: .65rem; background: #21170e; }
+    .backend-data span { display: block; color: #d8b784; font-size: .61rem; font-weight: 900; letter-spacing: .07em; }
+    .backend-data b { display: block; margin-top: .28rem; overflow: hidden; color: #fff1db; font-size: .81rem; text-overflow: ellipsis; white-space: nowrap; }
+    .backend-footer { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .72rem; }
+    .backend-footer p { margin: 0; color: var(--muted); font-size: .73rem; line-height: 1.35; }
+    .backend-footer .small-action { flex: 0 0 auto; }
+    @media (max-width: 820px) {
+      .backend-data-grid { grid-template-columns: 1fr 1fr; }
+      .backend-footer { align-items: stretch; flex-direction: column; }
+    }
+
+    /* Operations Deck redesign: a compact factory command surface, not a normal dashboard */
+    :root {
+      --ink: #f5f6ea;
+      --muted: #a9b3a5;
+      --deep: #0b100e;
+      --ground: #111a16;
+      --panel: rgba(18, 29, 24, .96);
+      --panel-solid: #15221b;
+      --line: rgba(202, 235, 173, .16);
+      --teal: #baf064;
+      --blue: #ffc15a;
+      --amber: #ffe08a;
+      --red: #ff6875;
+      --green: #96e878;
+      --shadow: 0 20px 56px rgba(0, 0, 0, .34);
+    }
+    html { background: var(--deep); }
+    body {
+      background:
+        radial-gradient(circle at 88% 1%, rgba(255, 193, 90, .17), transparent 26rem),
+        radial-gradient(circle at 8% 5%, rgba(186, 240, 100, .09), transparent 30rem),
+        linear-gradient(150deg, #0b100e 0%, #101914 48%, #090d0b 100%);
+    }
+    .app { max-width: 1640px; padding: .72rem clamp(.7rem, 2vw, 2rem) 2.2rem; position: relative; }
+    .app::before { content: ""; position: absolute; inset: .72rem clamp(.7rem, 2vw, 2rem) 0; pointer-events: none; opacity: .22; background-image: linear-gradient(rgba(211, 246, 179, .035) 1px, transparent 1px), linear-gradient(90deg, rgba(211, 246, 179, .035) 1px, transparent 1px); background-size: 2.75rem 2.75rem; mask-image: linear-gradient(to bottom, black, transparent 78%); }
+    .app > * { position: relative; z-index: 1; }
+    .topbar { display: grid; grid-template-columns: minmax(14rem, 1fr) auto; gap: 1rem; padding: .55rem 0 .75rem; border-bottom: 1px solid rgba(202, 235, 173, .24); }
+    .brand { gap: .82rem; }
+    .brand-mark { border-radius: .42rem; background: linear-gradient(135deg, #baf064, #ffe08a); color: #10160f; box-shadow: 0 0 0 1px rgba(186,240,100,.3), 0 10px 30px rgba(186,240,100,.14); }
+    .brand h1 { font-size: clamp(1.12rem, 2vw, 1.45rem); letter-spacing: -.045em; }
+    .brand p { color: #9ca99a; font-size: .72rem; letter-spacing: .035em; }
+    .top-actions { justify-content: flex-end; flex-wrap: wrap; }
+    .chip, .head-status, .backend-badge, .risk-chip, .algorithm-pill { border-radius: .28rem; }
+    .chip { color: #e9ffd0; background: rgba(186,240,100,.08); border-color: rgba(186,240,100,.26); }
+    .small-action { border-radius: .32rem; border-color: rgba(245,246,234,.15); background: #1a2920; color: #f5f6ea; }
+    .small-action.advanced-toggle { border-color: rgba(255,193,90,.52); color: #fff0c3; }
+    .small-action.advanced-toggle.active { color: #11150e; background: linear-gradient(135deg, #ffc15a, #ffe08a); border-color: #fff0ae; box-shadow: 0 8px 20px rgba(255,193,90,.16); }
+    .hero { margin-top: .72rem; padding: .82rem 1rem; align-items: center; border: 1px solid var(--line); border-left: 4px solid var(--teal); background: linear-gradient(100deg, rgba(23, 38, 29, .96), rgba(16, 26, 21, .72)); }
+    .hero h2 { font-size: clamp(1.12rem, 2.5vw, 1.62rem); }
+    .hero p:not(.eyebrow) { max-width: 54rem; }
+    .eyebrow { color: #d7e9a1; letter-spacing: .14em; }
+    .head-status { color: #e8ffd6; background: rgba(150,232,120,.09); border-color: rgba(150,232,120,.34); }
+    .command-ribbon { display: grid; grid-template-columns: 1.45fr repeat(3, minmax(0, .72fr)); gap: 1px; margin: .72rem 0; border: 1px solid var(--line); background: var(--line); box-shadow: var(--shadow); }
+    .command-cell { min-height: 4.3rem; padding: .7rem .8rem; background: #132018; display: grid; align-content: center; gap: .2rem; }
+    .command-cell.lead { display: flex; align-items: center; gap: .62rem; background: linear-gradient(90deg, #172b1e, #132018); }
+    .command-cell span { color: #9caa9a; font-size: .62rem; font-weight: 900; letter-spacing: .1em; }
+    .command-cell b { color: #f6f8ea; font-size: .82rem; }
+    .command-cell strong { color: var(--teal); font-size: 1.02rem; letter-spacing: -.02em; }
+    .command-pulse { width: .58rem; height: .58rem; border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 .26rem rgba(186,240,100,.1), 0 0 16px rgba(186,240,100,.44); animation: pulse 1.5s infinite; }
+    .main-grid { grid-template-columns: 12.3rem minmax(0, 1fr) 20.5rem; grid-template-areas: "rail machine side"; gap: .72rem; align-items: stretch; }
+    .ops-rail { grid-area: rail; padding: .75rem; display: grid; align-content: start; gap: .68rem; min-height: 100%; background: linear-gradient(180deg, rgba(23, 37, 29, .98), rgba(15, 24, 19, .98)); border-top: 3px solid var(--teal); }
+    .rail-head { display: grid; gap: .2rem; padding-bottom: .62rem; border-bottom: 1px solid var(--line); }
+    .rail-head p { margin: 0; }
+    .rail-head strong { font-size: .84rem; letter-spacing: .02em; }
+    .rail-signal { padding: .62rem; border: 1px solid rgba(186,240,100,.22); background: rgba(186,240,100,.065); }
+    .rail-signal span, .rail-readout span { display: block; color: #acb9a7; font-size: .58rem; font-weight: 900; letter-spacing: .1em; }
+    .rail-signal b { display: block; margin-top: .2rem; color: var(--teal); font-size: 1.16rem; letter-spacing: .06em; }
+    .rail-stages { display: grid; gap: .45rem; }
+    .rail-stage { display: grid; grid-template-columns: 1.55rem 1fr; gap: .45rem; align-items: center; padding: .42rem 0; border-bottom: 1px dashed rgba(202,235,173,.13); }
+    .rail-stage:last-child { border-bottom: 0; }
+    .rail-index { display: grid; place-items: center; width: 1.45rem; height: 1.45rem; color: #131a10; background: var(--blue); font-size: .61rem; font-weight: 900; }
+    .rail-stage:nth-child(2) .rail-index { background: var(--teal); }
+    .rail-stage:nth-child(3) .rail-index { background: var(--amber); }
+    .rail-stage:nth-child(4) .rail-index { background: #ff8a78; }
+    .rail-stage b { display: block; color: #f1f5e9; font-size: .7rem; }
+    .rail-stage span:not(.rail-index) { display: block; margin-top: .1rem; color: #94a18f; font-size: .6rem; line-height: 1.25; }
+    .rail-readouts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .rail-readout { min-height: 3.25rem; padding: .48rem; background: #111d16; }
+    .rail-readout b { display: block; margin-top: .18rem; color: #f4f8e8; font-size: .83rem; }
+    .rail-note { margin: 0; color: #94a18f; font-size: .64rem; line-height: 1.42; }
+    .machine-panel { grid-area: machine; border-radius: .42rem; border-top: 3px solid var(--blue); box-shadow: var(--shadow); }
+    .side { grid-area: side; border-radius: .42rem; border-top: 3px solid var(--red); padding: .85rem; background: linear-gradient(180deg, rgba(27, 38, 29, .98), rgba(16, 26, 21, .98)); }
+    .panel { border-radius: .42rem; background: var(--panel); border-color: var(--line); }
+    .machine-bar { padding: .75rem .9rem; background: rgba(23, 36, 28, .96); }
+    .machine-title h3 { font-size: .94rem; }
+    .machine-title span { color: #99a695; }
+    .machine-state { color: #b5c1af; }
+    .canvas-wrap { background: linear-gradient(180deg, #0d1611, #132019); }
+    #factoryCanvas { height: min(48vw, 480px); min-height: 350px; }
+    .canvas-badge { top: .75rem; left: .75rem; border-radius: .24rem; color: #f2f7df; border-color: rgba(186,240,100,.36); background: rgba(10,18,13,.82); }
+    .canvas-legend { right: .7rem; bottom: .65rem; }
+    .canvas-legend span { border-radius: .23rem; color: #dae8ca; background: rgba(11,18,13,.84); border-color: rgba(202,235,173,.18); }
+    .status-strip { background: #112018; }
+    .status-cell { padding: .72rem .72rem; border-color: var(--line); }
+    .status-cell p, .sensor-card p, .report-tile span { color: #a9b995; }
+    .status-cell strong { color: #f5f8e9; }
+    .controller-card, .sensor-card, .event, .cause-row, .future-item, .report-tile, .maintenance-callout, .backend-data { border-radius: .3rem; background: #15231a; border-color: rgba(202,235,173,.12); }
+    .controller-card { border-left: 3px solid var(--blue); }
+    .alarm-panel { display: flex; align-items: center; justify-content: space-between; gap: .55rem; padding: .62rem; border: 1px solid rgba(186,240,100,.2); border-left: 3px solid var(--teal); background: rgba(186,240,100,.055); }
+    .alarm-panel p { margin: 0 0 .14rem; color: #b8caa7; font-size: .58rem; font-weight: 900; letter-spacing: .09em; }
+    .alarm-panel b { display: block; color: var(--teal); font-size: .75rem; }
+    .alarm-panel span { display: block; margin-top: .13rem; color: #9ea99a; font-size: .61rem; line-height: 1.3; }
+    .alarm-panel .small-action { flex: 0 0 auto; padding: .4rem .46rem; font-size: .66rem; }
+    .alarm-panel.critical { border-color: var(--red); background: rgba(255,104,117,.11); animation: criticalAlarmPulse .48s ease-in-out infinite alternate; }
+    .alarm-panel.critical b { color: #ffd7d9; }
+    .alarm-panel.muted { border-color: rgba(255,193,90,.55); background: rgba(255,193,90,.08); }
+    @keyframes criticalAlarmPulse { to { box-shadow: 0 0 0 2px rgba(255,104,117,.14), 0 0 21px rgba(255,104,117,.22); } }
+    .decision { border-left-color: var(--teal); }
+    .meter, .feature .track, .metric-line > i, .health-meter { background: #2a3b2d; }
+    .control-grid { gap: .43rem; }
+    .control-button { border-radius: .3rem; background: #2b402f; }
+    .control-button.primary { color: #10170f; background: linear-gradient(135deg, #baf064, #8edd6f); }
+    .control-button.stop { background: #6e3037; }
+    .fault { border-radius: .3rem; background: #1b2c20; border-color: rgba(202,235,173,.15); color: #e7efdc; }
+    .fault.active { border-color: var(--amber); background: rgba(255,193,90,.13); color: #fff1c0; }
+    .analysis, .events, .intelligence, .trend-panel, .maintenance, .downtime-panel, .cause-panel, .workorder-panel, .future-panel, .backend-panel { border-radius: .42rem; }
+    .algorithm-pill { color: #f9e4aa; background: rgba(255,193,90,.1); border-color: rgba(255,193,90,.3); }
+    .backend-panel { border-left: 3px solid var(--teal); }
+    .backend-badge { color: #e9ffd1; background: rgba(186,240,100,.1); border-color: rgba(186,240,100,.3); }
+    .backend-footer { padding-top: .05rem; }
+    .oee-ring { background: conic-gradient(var(--teal) var(--oee), #2a3b2d 0); box-shadow: inset 0 0 0 1px rgba(202,235,173,.13), 0 0 28px rgba(186,240,100,.08); }
+    .oee-ring > div, .stop-orb::after { background: #15231a; border-color: rgba(202,235,173,.13); }
+    .stop-orb { background: conic-gradient(var(--teal) var(--risk), #2a3b2d 0); box-shadow: inset 0 0 0 1px rgba(202,235,173,.13), 0 0 28px rgba(186,240,100,.08); }
+    .trend-wrap { border-radius: .32rem; border-color: rgba(202,235,173,.12); background: linear-gradient(180deg, #14221a, #0e1611); }
+    .future-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .flow { gap: 1px; border: 1px solid var(--line); background: var(--line); }
+    .flow-step { border: 0; border-radius: 0; background: #142119; }
+    .footnote { max-width: 62rem; margin: 1rem auto .1rem; color: #94a18f; }
+    .modal { background: rgba(7, 11, 8, .82); }
+    .modal-card { border-radius: .42rem; background: #15231a; border-color: rgba(202,235,173,.24); }
+    .advanced-active .machine-panel { box-shadow: 0 0 0 1px rgba(186,240,100,.24), var(--shadow); }
+    .advanced-active .canvas-badge::after { color: var(--teal); }
+    .backend-chip { border-color: rgba(255,193,90,.34); background: rgba(255,193,90,.08); color: #fff0c3; }
+    .backend-chip.online { border-color: rgba(186,240,100,.34); background: rgba(186,240,100,.09); color: #e9ffd1; }
+    .backend-chip.online i { background: var(--teal); }
+    @media (max-width: 1230px) {
+      .main-grid { grid-template-columns: 11.2rem minmax(0, 1fr) 18rem; }
+    }
+    @media (max-width: 1080px) {
+      .main-grid { grid-template-columns: minmax(0, 1fr) 18rem; grid-template-areas: "rail rail" "machine side"; }
+      .ops-rail { grid-template-columns: 1.1fr .8fr 1.5fr .8fr; align-items: stretch; }
+      .rail-head { border-bottom: 0; padding-bottom: 0; }
+      .rail-stages { grid-template-columns: 1fr 1fr; }
+      .rail-readouts { align-self: stretch; }
+      .rail-note { align-self: center; }
+      .future-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 820px) {
+      .topbar { grid-template-columns: 1fr; }
+      .top-actions { justify-content: flex-start; }
+      .command-ribbon { grid-template-columns: 1fr 1fr; }
+      .command-cell.lead { grid-column: 1 / -1; }
+      .main-grid { display: block; }
+      .ops-rail, .side { margin-top: .72rem; }
+      .ops-rail { grid-template-columns: 1fr; }
+      .rail-head { border-bottom: 1px solid var(--line); padding-bottom: .62rem; }
+      .rail-stages { grid-template-columns: 1fr 1fr; }
+      .side { position: static; }
+    }
+    @media (max-width: 520px) {
+      .command-ribbon { grid-template-columns: 1fr 1fr; }
+      .command-cell { min-height: 3.75rem; }
+      .rail-stages, .future-grid { grid-template-columns: 1fr; }
+      .future-grid { gap: .48rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app advanced-active" id="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12"/></svg>
+        </div>
+        <div><h1>AutoForge Sentinel</h1><p>Smart Production Line · Downtime Prediction Digital Twin</p></div>
+      </div>
+      <div class="top-actions">
+        <span class="chip"><i></i> DIGITAL TWIN LIVE</span>
+        <span class="chip backend-chip" id="backendStatus"><i></i><span>DATA CONNECTING</span></span>
+        <button class="small-action advanced-toggle active" id="advancedButton">Advanced Mode: ON</button>
+        <button class="small-action" id="vivaButton">Viva Script</button>
+        <button class="small-action" id="presentationButton">Presentation Mode</button>
+      </div>
+    </header>
+
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Smart downtime prediction replica</p>
+        <h2 id="heroTitle">Motor, conveyor and AI inspection are running automatically</h2>
+        <p id="heroText">The line is producing parts while AI tracks sensor drift, product quality and possible downtime risk.</p>
+      </div>
+      <span class="head-status" id="headStatus"><i></i><span>AUTO MODE · HEALTHY</span></span>
+    </section>
+
+    <section class="command-ribbon" aria-label="Live operational summary">
+      <div class="command-cell lead"><span class="command-pulse" aria-hidden="true"></span><div><span>ACTIVE PRODUCTION ZONE</span><b>LINE 01 · CELL A · DIGITAL SHIFT</b></div></div>
+      <div class="command-cell"><span>QUALITY DECISION</span><strong id="ribbonQuality">GOOD</strong></div>
+      <div class="command-cell"><span>FUSION RISK</span><strong id="ribbonRisk">0 / 100</strong></div>
+      <div class="command-cell"><span>LIVE SPEED</span><strong id="ribbonSpeed">100%</strong></div>
+    </section>
+
+    <section class="main-grid">
+      <aside class="ops-rail panel" aria-label="Operations command rail">
+        <div class="rail-head"><p class="eyebrow">Shift command rail</p><strong>LINE-01 / CELL-A</strong></div>
+        <div class="rail-signal"><span>LIVE CLASSIFICATION</span><b id="railQuality">GOOD</b></div>
+        <div class="rail-stages">
+          <div class="rail-stage"><span class="rail-index">01</span><div><b>Acquire</b><span>4 sensor channels</span></div></div>
+          <div class="rail-stage"><span class="rail-index">02</span><div><b>Fuse</b><span>model checks drift</span></div></div>
+          <div class="rail-stage"><span class="rail-index">03</span><div><b>Route</b><span>pass, review or reject</span></div></div>
+          <div class="rail-stage"><span class="rail-index">04</span><div><b>Protect</b><span>human-approved response</span></div></div>
+        </div>
+        <div class="rail-readouts">
+          <div class="rail-readout"><span>OEE</span><b id="railOee">100%</b></div>
+          <div class="rail-readout"><span>STOP RISK</span><b id="railRisk">08%</b></div>
+          <div class="rail-readout"><span>BATCH</span><b id="railBatch">SIM-AF-01</b></div>
+          <div class="rail-readout"><span>DATA</span><b id="railData">LINKING</b></div>
+        </div>
+        <p class="rail-note">Cloud records retain packet decisions, fault events and maintenance actions for this simulated shift.</p>
+      </aside>
+      <article class="machine-panel panel">
+        <div class="machine-bar">
+          <div class="machine-title"><span class="live-dot"></span><div><h3>Live Autonomous Cell</h3><span>Infeed magazine → rotary sensor table → edge-AI core → robotic sort rack</span></div></div>
+          <div class="machine-state">LINE STATE: <b id="lineState">RUNNING</b></div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="factoryCanvas" aria-label="Animated autonomous production cell with an infeed magazine, rotary inspection, edge AI and robotic sorting routes"></canvas>
+          <span class="canvas-badge">AUTONOMOUS TWIN CELL · SIMULATED</span>
+          <div class="canvas-legend"><span>● flow packet</span><span style="color:#ffd166">● review route</span><span style="color:#ff6666">● reject route</span></div>
+        </div>
+        <div class="status-strip">
+          <div class="status-cell"><p>LINE SPEED</p><strong id="speedReadout">100%</strong></div>
+          <div class="status-cell"><p>TOTAL PACKETS</p><strong id="totalReadout">0</strong></div>
+          <div class="status-cell"><p>GOOD PASSED</p><strong id="goodReadout">0</strong></div>
+          <div class="status-cell"><p>WARNING / REVIEW</p><strong id="warningReadout">0</strong></div>
+          <div class="status-cell"><p>DEFECT REJECTED</p><strong id="defectReadout">0</strong></div>
+          <div class="status-cell"><p>GOOD PASS RATE</p><strong id="passRateReadout">100%</strong></div>
+        </div>
+      </article>
+
+      <aside class="side panel">
+        <div>
+          <p class="eyebrow">Autonomous controller</p>
+          <h3>AI quality command</h3>
+        </div>
+        <div class="controller-card">
+          <div class="controller-head"><h4 id="decisionTitle">GOOD · release part</h4><span class="autopilot"><i></i> AUTO</span></div>
+          <div class="decision" id="decisionBox"><b id="decisionAction">Conveyor runs at target speed</b><span id="decisionReason">Current vibration, temperature, current and RPM match a healthy process pattern.</span></div>
+          <div class="confidence-row"><span>Model confidence</span><b id="confidenceReadout">96%</b></div>
+          <div class="meter"><i id="confidenceMeter"></i></div>
+        </div>
+        <div class="control-grid">
+          <button class="control-button primary" id="runButton">Pause Line</button>
+          <button class="control-button" id="autopilotButton">Autopilot: ON</button>
+          <button class="control-button" id="resetButton">Reset Cycle</button>
+          <button class="control-button stop" id="safetyButton">Manual Safety Hold</button>
+        </div>
+        <div class="speed-row">
+          <label for="speedSlider"><span>Target line speed</span><output id="speedOutput">100%</output></label>
+          <input id="speedSlider" type="range" min="35" max="130" value="100">
+        </div>
+        <div class="alarm-panel" id="alarmPanel" aria-live="polite">
+          <div><p class="eyebrow">Simulated alert sensor</p><b id="alarmStatus">QUIET · GOOD</b><span id="alarmDetail">No buzzer during healthy production.</span></div>
+          <button class="small-action" id="alarmButton" type="button">Arm buzzer</button>
+        </div>
+        <hr class="line">
+        <div><p class="eyebrow">Inject a process condition</p><div class="fault-grid" id="faultGrid">
+          <button class="fault active" data-fault="normal"><i></i>Healthy run</button>
+          <button class="fault warn" data-fault="tool"><i></i>Tool wear</button>
+          <button class="fault bad" data-fault="bearing"><i></i>Bearing fault</button>
+          <button class="fault bad" data-fault="overheat"><i></i>Overheat</button>
+          <button class="fault bad" data-fault="jam"><i></i>Conveyor jam</button>
+        </div></div>
+      </aside>
+    </section>
+
+    <section class="lower-grid">
+      <article class="analysis panel">
+        <div class="analysis-head"><div><p class="eyebrow">Sensor fusion & explainable AI</p><h3>Current process reading</h3></div><span class="algorithm-pill">Random Forest replica</span></div>
+        <div class="sensor-grid">
+          <div class="sensor-card"><p>MOTOR RPM</p><strong id="rpmReadout">1450</strong><span id="rpmState">normal speed</span></div>
+          <div class="sensor-card"><p>VIBRATION RMS</p><strong id="vibrationReadout">0.18 g</strong><span id="vibrationState">inside limit</span></div>
+          <div class="sensor-card"><p>TEMPERATURE</p><strong id="temperatureReadout">39.0°C</strong><span id="temperatureState">inside limit</span></div>
+          <div class="sensor-card"><p>MOTOR CURRENT</p><strong id="currentReadout">0.70 A</strong><span id="currentState">stable load</span></div>
+        </div>
+        <div class="feature-list" id="featureList"></div>
+      </article>
+      <article class="events panel">
+        <div class="events-head"><div><p class="eyebrow">Autonomous event console</p><h3>Machine decisions</h3></div><button class="small-action" id="downloadButton">Export packet CSV</button></div>
+        <div class="event-list" id="eventList"></div>
+      </article>
+    </section>
+
+    <section class="ledger panel">
+      <div class="ledger-head">
+        <div><p class="eyebrow">Packet-level traceability</p><h3>Live Packet Inspection Ledger</h3></div>
+        <div class="ledger-note">Every completed packet stores its sensor reading, AI result and automatic routing action.</div>
+      </div>
+      <div class="table-wrap">
+        <table class="packet-table">
+          <thead><tr><th>Packet ID</th><th>Time</th><th>RPM</th><th>Vibration</th><th>Temperature</th><th>Current</th><th>AI Result</th><th>Auto Action</th></tr></thead>
+          <tbody id="packetLedger"><tr><td class="empty-ledger" colspan="8">Packets will appear here after they pass the AI inspection gate.</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="backend-panel panel" aria-label="Persistent backend data status">
+      <div class="backend-head">
+        <div><p class="eyebrow">Persistent cloud data</p><h3>Backend batch records</h3></div>
+        <span class="backend-badge" id="backendBadge">CONNECTING</span>
+      </div>
+      <div class="backend-data-grid">
+        <div class="backend-data"><span>ACTIVE BATCH</span><b id="serverBatchReadout">Preparing…</b></div>
+        <div class="backend-data"><span>PACKETS SAVED</span><b id="serverPacketReadout">0</b></div>
+        <div class="backend-data"><span>EVENTS SAVED</span><b id="serverEventReadout">0</b></div>
+        <div class="backend-data"><span>LAST CLOUD SYNC</span><b id="serverSyncReadout">Waiting</b></div>
+      </div>
+      <div class="backend-footer"><p id="backendMessage">Connecting this live simulation to its persistent backend database…</p><button class="small-action" id="syncButton">Sync cloud data</button></div>
+    </section>
+
+    <section class="advanced-grid" aria-label="Simulated production intelligence">
+      <article class="intelligence panel">
+        <div class="intelligence-head"><div><p class="eyebrow">Operational intelligence</p><h3>OEE & batch forecast</h3></div><span class="algorithm-pill">SIMULATED</span></div>
+        <div class="oee-layout">
+          <div class="oee-ring" id="oeeRing"><div><b id="oeeReadout">100%</b><span>OEE SCORE</span></div></div>
+          <div class="metric-list">
+            <div class="metric-line"><div><span>Availability</span><b id="availabilityReadout">100%</b></div><i><b id="availabilityBar"></b></i></div>
+            <div class="metric-line"><div><span>Performance</span><b id="performanceReadout">100%</b></div><i><b id="performanceBar"></b></i></div>
+            <div class="metric-line"><div><span>Quality</span><b id="qualityReadout">100%</b></div><i><b id="qualityBar"></b></i></div>
+          </div>
+        </div>
+        <div class="forecast-card"><p><span id="batchReadout">SIM-AF-01</span> · NEXT 5 PACKETS</p><b id="forecastReadout">5/5 likely to pass</b><span id="forecastDetail">Healthy sensor fusion predicts a stable short-run output.</span></div>
+        <button class="small-action wide-action" id="batchReportButton">Generate batch report</button>
+      </article>
+
+      <article class="trend-panel panel">
+        <div class="trend-head"><div><p class="eyebrow">Live anomaly timeline</p><h3>Process risk trend</h3></div><span class="risk-chip good" id="riskPill">LOW RISK</span></div>
+        <div class="trend-wrap"><canvas id="anomalyCanvas" aria-label="Rolling simulated process anomaly trend chart"></canvas></div>
+        <div class="trend-caption"><span>Fusion score · advisory ≥ 30 · critical ≥ 60</span><b id="anomalyReadout">0 / 100</b></div>
+      </article>
+
+      <article class="maintenance panel">
+        <div class="maintenance-head"><div><p class="eyebrow">Predictive maintenance</p><h3>Machine health estimate</h3></div><span class="algorithm-pill">AI ASSIST</span></div>
+        <div class="health-stack">
+          <div class="health-row"><div><span>Drive train</span><b id="driveHealthReadout">100%</b></div><div class="health-meter"><i id="driveHealthBar"></i></div></div>
+          <div class="health-row"><div><span>Bearing assembly</span><b id="bearingHealthReadout">100%</b></div><div class="health-meter"><i id="bearingHealthBar"></i></div></div>
+          <div class="health-row"><div><span>Thermal system</span><b id="thermalHealthReadout">100%</b></div><div class="health-meter"><i id="thermalHealthBar"></i></div></div>
+        </div>
+        <div class="maintenance-callout" id="maintenanceCallout"><p>RECOMMENDED ACTION</p><b id="inspectionTitle">Continue monitored production</b><span id="inspectionDetail">All simulated component-health indicators are in the healthy range.</span></div>
+      </article>
+    </section>
+
+    <section class="downtime-grid" aria-label="Smart downtime prediction command center">
+      <article class="downtime-panel panel">
+        <div class="downtime-head">
+          <div><p class="eyebrow">Predictive downtime command</p><h3>Will this line stop soon?</h3></div>
+          <span class="risk-chip good" id="downtimePill">STABLE RUN</span>
+        </div>
+        <div class="prediction-shell">
+          <div class="stop-orb" id="stopOrb"><div><b id="downtimeProbability">08%</b><span>30 MIN RISK</span></div></div>
+          <div class="prediction-copy"><p>PREDICTED INTERRUPTION</p><b id="downtimeForecast">No stop expected in the next 60 min</b><span id="downtimeDetail">The healthy drive, bearing and thermal pattern supports continued monitored production.</span></div>
+        </div>
+        <div class="line-map" aria-label="Live smart production line health map">
+          <div class="twin-node" id="nodeDrive"><i></i><b>Drive</b><span id="nodeDriveText">100% health</span></div>
+          <div class="twin-node" id="nodeBelt"><i></i><b>Conveyor</b><span id="nodeBeltText">running</span></div>
+          <div class="twin-node" id="nodeSense"><i></i><b>Sensor hub</b><span id="nodeSenseText">signals live</span></div>
+          <div class="twin-node" id="nodeAi"><i></i><b>AI model</b><span id="nodeAiText">low risk</span></div>
+          <div class="twin-node" id="nodeAct"><i></i><b>Actuator</b><span id="nodeActText">ready</span></div>
+        </div>
+        <div class="downtime-actions">
+          <button class="control-button" id="ackAlertButton">Acknowledge alert</button>
+          <button class="control-button primary" id="workOrderButton">Create maintenance work order</button>
+        </div>
+      </article>
+
+      <article class="cause-panel panel">
+        <div class="cause-head"><div><p class="eyebrow">Explainable prediction</p><h3>Likely downtime drivers</h3></div><span class="algorithm-pill">RISK RANKING</span></div>
+        <div class="cause-list" id="causeList"></div>
+      </article>
+
+      <article class="workorder-panel panel">
+        <div class="workorder-head"><div><p class="eyebrow">Human-approved action</p><h3>Maintenance response</h3></div><span class="algorithm-pill">SAFE MODE</span></div>
+        <div class="workorder-status"><i></i><span id="workOrderStatus">No work order required · monitor only</span></div>
+        <div class="workorder-list">
+          <div class="workorder-item"><span>Suggested action</span><b id="repairAction">Continue monitored run</b></div>
+          <div class="workorder-item"><span>Estimated service time</span><b id="repairTime">0 min</b></div>
+          <div class="workorder-item"><span>Maintenance window</span><b id="maintenanceWindow">Next planned break</b></div>
+          <div class="workorder-item"><span>Operator acknowledgement</span><b id="ackState">Pending</b></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="future-panel panel" aria-label="Mini project hardware and future scope" style="margin-top:.9rem">
+      <div class="future-head"><div><p class="eyebrow">Mini-project path & future scope</p><h3>How this browser prototype becomes a real smart factory system</h3></div><span class="algorithm-pill">LOW-VOLTAGE PROTOTYPE</span></div>
+      <div class="future-grid">
+        <div class="future-item"><b>Sensor layer</b><span>ESP32 + MPU6050 vibration, INA219 current, DS18B20 temperature and Hall-effect RPM sensor.</span></div>
+        <div class="future-item"><b>Edge intelligence</b><span>Python or Node service uses labelled sensor history to estimate anomaly score and remaining healthy time.</span></div>
+        <div class="future-item"><b>Maintenance planning</b><span>Auto-create a suggested work order, spare-parts checklist and service window for human approval.</span></div>
+        <div class="future-item"><b>Future scale-up</b><span>MQTT/cloud dashboard, multi-line comparison, camera inspection and energy/OEE optimization across the plant.</span></div>
+      </div>
+    </section>
+
+    <section class="flow" aria-label="Automatic workflow">
+      <div class="flow-step"><b>1. Drive motor</b><span>shaft rotates</span></div>
+      <div class="flow-step"><b>2. Move part</b><span>conveyor feed</span></div>
+      <div class="flow-step"><b>3. Read sensors</b><span>RPM · vibration · heat · current</span></div>
+      <div class="flow-step"><b>4. Predict risk</b><span>quality + downtime</span></div>
+      <div class="flow-step"><b>5. Human-approved act</b><span>release, slow, divert or service</span></div>
+    </section>
+    <p class="footnote">Simulation only: the forecast and work-order actions are a digital-twin demo, not a command to stop real equipment. A physical version uses validated low-voltage sensors, measured labels and human-approved safety controls.</p>
+  </div>
+
+  <div class="modal" id="vivaModal" role="dialog" aria-modal="true" aria-labelledby="vivaTitle">
+    <div class="modal-card">
+      <p class="eyebrow">Teacher explanation</p>
+      <h2 id="vivaTitle">What to say in viva</h2>
+      <ol>
+        <li>“This is an autonomous digital twin of a smart production cell, not only a normal dashboard.”</li>
+        <li>“Packets enter through the infeed magazine, move over a rotary inspection table and are checked for RPM, vibration, temperature and current.”</li>
+        <li>“The edge-AI core combines all sensor values and classifies the process as Good, Warning or Reject.”</li>
+        <li>“Advanced Mode adds live sensor fusion, OEE, downtime prediction, predictive maintenance and a human-approved maintenance work order.”</li>
+        <li>“When risk is high, the twin reduces speed and routes the packet through the robotic sorting rack; this website remains a safe simulation for demonstration.”</li>
+      </ol>
+      <div class="modal-actions"><button class="control-button primary" id="closeViva">Close</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="batchModal" role="dialog" aria-modal="true" aria-labelledby="batchTitle">
+    <div class="modal-card report-card">
+      <p class="eyebrow">Simulated shift summary</p>
+      <h2 id="batchTitle">Batch quality report</h2>
+      <div class="report-grid">
+        <div class="report-tile"><span>BATCH ID</span><b id="reportBatch">SIM-AF-01</b></div>
+        <div class="report-tile"><span>OEE SCORE</span><b id="reportOee">100%</b></div>
+        <div class="report-tile"><span>TOTAL PACKETS</span><b id="reportTotal">0</b></div>
+        <div class="report-tile"><span>GOOD PASSED</span><b id="reportGood">0</b></div>
+        <div class="report-tile"><span>DEFECT REJECTED</span><b id="reportRejected">0</b></div>
+        <div class="report-tile"><span>LIVE RISK</span><b id="reportRisk">0 / 100</b></div>
+      </div>
+      <div class="report-note" id="reportNote">The model is waiting for live simulated sensor samples.</div>
+      <div class="modal-actions"><button class="control-button primary" id="closeBatch">Close report</button></div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("factoryCanvas");
+    const ctx = canvas.getContext("2d");
+    const $ = id => document.getElementById(id);
+    const anomalyCanvas = $("anomalyCanvas");
+    const anomalyCtx = anomalyCanvas.getContext("2d");
+    const state = {
+      running: true,
+      autopilot: true,
+      advancedMode: true,
+      manualSpeed: 100,
+      effectiveSpeed: 100,
+      fault: "normal",
+      parts: [],
+      lastFrame: 0,
+      lastSpawn: 0,
+      lastSensor: 0,
+      startTime: Date.now(),
+      total: 0,
+      passed: 0,
+      rejected: 0,
+      warnings: 0,
+      packetLog: [],
+      nextPacketId: 1,
+      batchNumber: 1,
+      anomalyHistory: [],
+      safetyHolds: 0,
+      consecutiveRejects: 0,
+      continuousAlertNotified: false,
+      alarm: {
+        audioContext: null,
+        armed: false,
+        muted: false,
+        critical: false,
+        timer: null
+      },
+      currentDiverter: 0,
+      events: [],
+      alertAcknowledged: false,
+      workOrderCreated: false,
+      backend: {
+        ready: false,
+        error: "",
+        sessionId: null,
+        clientKey: null,
+        storedPackets: 0,
+        storedEvents: 0,
+        lastSync: null
+      },
+      selectedDecision: { level: "GOOD", confidence: 96, action: "Conveyor runs at target speed", reason: "Current vibration, temperature, current and RPM match a healthy process pattern." },
+      sensors: { rpm: 1450, vibration: .18, temperature: 39, current: .70 },
+      sequenceStart: performance.now(),
+      randomSeed: 20260930
+    };
+    const profiles = {
+      normal: { title: "Healthy production", sensors: { rpm: 1450, vibration: .18, temperature: 39, current: .70 }, severity: "good" },
+      tool: { title: "Tool wear condition", sensors: { rpm: 1382, vibration: .72, temperature: 53, current: .88 }, severity: "warning" },
+      bearing: { title: "Bearing fault condition", sensors: { rpm: 1190, vibration: 1.46, temperature: 67, current: 1.34 }, severity: "reject" },
+      overheat: { title: "Overheating condition", sensors: { rpm: 1315, vibration: .57, temperature: 87, current: 1.13 }, severity: "reject" },
+      jam: { title: "Conveyor jam condition", sensors: { rpm: 1055, vibration: 1.05, temperature: 47, current: 1.48 }, severity: "reject" }
+    };
+    function rand() {
+      state.randomSeed = (state.randomSeed * 1664525 + 1013904223) >>> 0;
+      return state.randomSeed / 4294967296;
+    }
+    function signedNoise(amount) { return (rand() - .5) * amount; }
+    function timeText() {
+      return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+    function addEvent(text, kind = "normal") {
+      const event = { at: timeText(), text, kind };
+      state.events.unshift(event);
+      state.events = state.events.slice(0, 13);
+      renderEvents();
+      if (state.backend.ready) void persistEvent(event);
+    }
+    function renderEvents() {
+      $("eventList").innerHTML = state.events.map(item =>
+        '<div class="event ' + (item.kind === "warning" ? "warn" : item.kind === "reject" ? "bad" : "") + '"><i></i><div><div class="event-time">' + item.at + '</div><div class="event-text">' + item.text + '</div></div></div>'
+      ).join("");
+    }
+    function packetAction(quality) {
+      if (quality === "GOOD") return "Released to pass bin";
+      if (quality === "WARNING") return "Released with review flag";
+      return "Auto-diverted to reject bin";
+    }
+    function recordPacket(part) {
+      const reading = part.readingSnapshot || { ...state.sensors };
+      state.packetLog.unshift({
+        id: part.id,
+        at: part.scannedAt || timeText(),
+        rpm: reading.rpm,
+        vibration: reading.vibration,
+        temperature: reading.temperature,
+        current: reading.current,
+        result: part.quality,
+        action: packetAction(part.quality)
+      });
+      state.packetLog = state.packetLog.slice(0, 12);
+      renderPacketLedger();
+      updateOperationalIntelligence();
+      if (state.backend.ready) void persistPacket(state.packetLog[0]);
+    }
+    function renderPacketLedger() {
+      const root = $("packetLedger");
+      if (!state.packetLog.length) {
+        root.innerHTML = '<tr><td class="empty-ledger" colspan="8">Packets will appear here after they pass the AI inspection gate.</td></tr>';
+        return;
+      }
+      root.innerHTML = state.packetLog.map(packet => {
+        const resultClass = packet.result === "GOOD" ? "good" : packet.result === "WARNING" ? "warning" : "reject";
+        return '<tr><td>PKT-' + String(packet.id).padStart(3, "0") + '</td><td>' + packet.at + '</td><td>' + packet.rpm + '</td><td>' + packet.vibration.toFixed(2) + ' g</td><td>' + packet.temperature.toFixed(1) + ' °C</td><td>' + packet.current.toFixed(2) + ' A</td><td><span class="packet-result ' + resultClass + '">' + packet.result + '</span></td><td>' + packet.action + '</td></tr>';
+      }).join("");
+    }
+    function makeBrowserClientKey() {
+      const storageKey = "autoforge_demo_client_key";
+      try {
+        let key = localStorage.getItem(storageKey) || "";
+        if (!/^[A-Za-z0-9_-]{12,96}$/.test(key)) {
+          const suffix = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, "") : Date.now().toString(36) + Math.random().toString(36).slice(2);
+          key = "client-" + suffix;
+          localStorage.setItem(storageKey, key);
+        }
+        return key;
+      } catch {
+        return "client-" + Date.now().toString(36) + Math.random().toString(36).slice(2);
+      }
+    }
+    async function backendRequest(path, options = {}) {
+      const init = { method: options.method || "GET", headers: { accept: "application/json" } };
+      if (options.body) {
+        init.headers["content-type"] = "application/json";
+        init.body = JSON.stringify(options.body);
+      }
+      const response = await fetch(path, init);
+      let data;
+      try { data = await response.json(); } catch { data = null; }
+      if (!response.ok || !data || !data.ok) throw new Error(data?.error || "Cloud data service is unavailable.");
+      return data;
+    }
+    function syncTime(value) {
+      if (!value) return "Waiting";
+      try {
+        return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+      } catch {
+        return "Saved";
+      }
+    }
+    function updateBackendUi(message) {
+      const backend = state.backend;
+      const stateClass = backend.ready ? "online" : backend.error ? "error" : "";
+      const label = backend.ready ? "DATABASE LIVE" : backend.error ? "DATA OFFLINE" : "DATA CONNECTING";
+      const topStatus = $("backendStatus");
+      topStatus.className = "chip backend-chip " + stateClass;
+      topStatus.querySelector("span").textContent = label;
+      const badge = $("backendBadge");
+      badge.className = "backend-badge " + stateClass;
+      badge.textContent = backend.ready ? "PERSISTENT DATA" : backend.error ? "SYNC PAUSED" : "CONNECTING";
+      $("serverBatchReadout").textContent = backend.sessionId ? batchId() : "Preparing…";
+      $("serverPacketReadout").textContent = backend.storedPackets || 0;
+      $("serverEventReadout").textContent = backend.storedEvents || 0;
+      $("serverSyncReadout").textContent = syncTime(backend.lastSync);
+      $("backendMessage").textContent = message || (backend.ready ? "This batch is stored in the persistent simulation database and can be restored after refresh." : backend.error || "Connecting this live simulation to its persistent backend database…");
+      $("syncButton").textContent = backend.ready ? "Sync cloud data" : "Retry connection";
+      const railData = $("railData");
+      if (railData) railData.textContent = backend.ready ? "LIVE" : backend.error ? "OFFLINE" : "LINKING";
+    }
+    function backendFailure(error) {
+      state.backend.ready = false;
+      state.backend.error = error instanceof Error ? error.message : "Cloud sync failed.";
+      updateBackendUi();
+    }
+    function hydrateBackendPayload(payload, restoreRecords = true) {
+      const session = payload.session;
+      if (!session) return;
+      const backend = state.backend;
+      backend.ready = true;
+      backend.error = "";
+      backend.sessionId = session.id;
+      backend.storedPackets = Number(session.total_packets) || 0;
+      backend.storedEvents = Number(session.event_count) || 0;
+      backend.lastSync = payload.serverTime || session.updated_at || new Date().toISOString();
+      state.batchNumber = Number(session.batch_number) || state.batchNumber;
+      if (restoreRecords) {
+        state.total = Number(session.total_packets) || 0;
+        state.passed = Number(session.passed_packets) || 0;
+        state.warnings = Number(session.warning_packets) || 0;
+        state.rejected = Number(session.rejected_packets) || 0;
+        state.packetLog = (payload.packets || []).map(packet => ({
+          id: Number(packet.packet_no),
+          at: packet.scanned_at,
+          rpm: Number(packet.rpm),
+          vibration: Number(packet.vibration),
+          temperature: Number(packet.temperature),
+          current: Number(packet.current),
+          result: packet.ai_result,
+          action: packet.auto_action
+        })).filter(packet => Number.isFinite(packet.id));
+        state.events = (payload.events || []).map(event => ({
+          at: event.event_time,
+          text: event.message,
+          kind: event.level || "normal"
+        }));
+        state.nextPacketId = Math.max(1, state.total + 1, ...state.packetLog.map(packet => packet.id + 1));
+        state.workOrderCreated = (payload.workOrders || []).length > 0;
+        state.alertAcknowledged = state.workOrderCreated;
+        renderPacketLedger();
+        renderEvents();
+        updateStats();
+        updateOperationalIntelligence();
+      }
+      updateBackendUi();
+    }
+    async function initializeBackend() {
+      const backend = state.backend;
+      backend.clientKey = backend.clientKey || makeBrowserClientKey();
+      backend.error = "";
+      updateBackendUi("Connecting this live simulation to its persistent backend database…");
+      try {
+        const payload = await backendRequest("/api/bootstrap", { method: "POST", body: { clientKey: backend.clientKey } });
+        hydrateBackendPayload(payload, true);
+        addEvent("Persistent backend connected for " + batchId() + ".", "normal");
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    async function startBackendBatch() {
+      const backend = state.backend;
+      backend.clientKey = backend.clientKey || makeBrowserClientKey();
+      backend.ready = false;
+      backend.error = "";
+      updateBackendUi("Creating a new persistent batch record…");
+      try {
+        const payload = await backendRequest("/api/sessions/new", { method: "POST", body: { clientKey: backend.clientKey } });
+        hydrateBackendPayload({ session: payload.session, packets: [], events: [], workOrders: [], serverTime: payload.serverTime }, false);
+        backend.storedPackets = 0;
+        backend.storedEvents = 0;
+        updateBackendUi("New batch created in the persistent simulation database.");
+        addEvent("New cloud batch " + batchId() + " created.", "normal");
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    async function persistPacket(packet) {
+      const backend = state.backend;
+      if (!backend.ready || !backend.sessionId || !packet) return;
+      const metrics = operationalSnapshot();
+      try {
+        const payload = await backendRequest("/api/packets", {
+          method: "POST",
+          body: {
+            sessionId: backend.sessionId,
+            packet,
+            metrics: {
+              total: state.total,
+              passed: state.passed,
+              warnings: state.warnings,
+              rejected: state.rejected,
+              oee: metrics.oee,
+              risk: metrics.risk,
+              status: state.running ? "running" : "safety_hold"
+            }
+          }
+        });
+        backend.storedPackets = state.total;
+        backend.lastSync = payload.updatedAt || new Date().toISOString();
+        updateBackendUi();
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    async function persistEvent(event) {
+      const backend = state.backend;
+      if (!backend.ready || !backend.sessionId || !event) return;
+      try {
+        const payload = await backendRequest("/api/events", { method: "POST", body: { sessionId: backend.sessionId, event } });
+        backend.storedEvents++;
+        backend.lastSync = payload.updatedAt || new Date().toISOString();
+        updateBackendUi();
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    async function persistWorkOrder(prediction) {
+      const backend = state.backend;
+      if (!backend.ready || !backend.sessionId || !prediction) return;
+      try {
+        const payload = await backendRequest("/api/work-orders", {
+          method: "POST",
+          body: {
+            sessionId: backend.sessionId,
+            workOrder: {
+              action: prediction.action,
+              repair: prediction.repair,
+              window: prediction.window,
+              severity: prediction.severity
+            }
+          }
+        });
+        backend.lastSync = payload.updatedAt || new Date().toISOString();
+        updateBackendUi("Maintenance work order saved in the persistent backend.");
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    async function syncBackendData() {
+      const backend = state.backend;
+      if (!backend.ready || !backend.sessionId) {
+        await initializeBackend();
+        return;
+      }
+      updateBackendUi("Syncing the latest saved packets, events and work orders…");
+      try {
+        const payload = await backendRequest("/api/sessions/" + encodeURIComponent(backend.sessionId));
+        hydrateBackendPayload(payload, true);
+        updateBackendUi("Cloud data sync completed successfully.");
+      } catch (error) {
+        backendFailure(error);
+      }
+    }
+    function batchId() {
+      return "SIM-AF-" + String(state.batchNumber).padStart(2, "0");
+    }
+    function healthColor(value) {
+      return value >= 76 ? "var(--green)" : value >= 52 ? "var(--amber)" : "var(--red)";
+    }
+    function operationalSnapshot() {
+      const availability = state.running ? Math.max(84, 100 - state.safetyHolds * 4) : Math.max(58, 76 - state.safetyHolds * 3);
+      const performance = state.manualSpeed ? Math.max(0, Math.min(100, Math.round(state.effectiveSpeed / state.manualSpeed * 100))) : 0;
+      const quality = state.total ? Math.round(state.passed / state.total * 100) : 100;
+      const oee = Math.round(availability * performance * quality / 10000);
+      const risk = state.anomalyHistory.length ? state.anomalyHistory[state.anomalyHistory.length - 1].value : 0;
+      return { availability, performance, quality, oee, risk };
+    }
+    function maintenanceSnapshot() {
+      const scores = state.selectedDecision.scores || { vibration: 0, temperature: 0, current: 0, rpm: 0 };
+      const drive = Math.max(0, Math.round(100 - scores.rpm * .58 - scores.current * .22));
+      const bearing = Math.max(0, Math.round(100 - scores.vibration * .86 - scores.current * .12));
+      const thermal = Math.max(0, Math.round(100 - scores.temperature * .90 - scores.current * .10));
+      const weakest = [
+        { name: "drive train", value: drive },
+        { name: "bearing assembly", value: bearing },
+        { name: "thermal system", value: thermal }
+      ].sort((a, b) => a.value - b.value)[0];
+      let title = "Continue monitored production";
+      let detail = "All simulated component-health indicators are in the healthy range.";
+      if (weakest.value < 76) {
+        title = weakest.value < 52 ? "Inspect " + weakest.name + " before next run" : "Plan an inspection for " + weakest.name;
+        detail = weakest.value < 52 ? "Critical simulated degradation is driving the autonomous quality response." : "Early simulated degradation has been detected; monitor the trend during this shift.";
+      }
+      return { drive, bearing, thermal, weakest, title, detail };
+    }
+    function downtimeSnapshot() {
+      const maintenance = maintenanceSnapshot();
+      const metrics = operationalSnapshot();
+      const d = state.selectedDecision;
+      const causes = [
+        { key: "vibration", label: "Bearing vibration", detail: "RMS vibration trending above the healthy baseline", value: d.scores?.vibration || 0 },
+        { key: "temperature", label: "Thermal rise", detail: "Drive temperature moving toward the thermal limit", value: d.scores?.temperature || 0 },
+        { key: "current", label: "Conveyor load", detail: "Motor-current increase can indicate drag or a jam", value: d.scores?.current || 0 },
+        { key: "rpm", label: "RPM instability", detail: "Speed deviation can indicate drive or transmission loss", value: d.scores?.rpm || 0 }
+      ].sort((a, b) => b.value - a.value);
+      const profile = {
+        normal: { action: "Continue monitored run", repair: "0 min", window: "Next planned break", label: "No stop expected in the next 60 min" },
+        tool: { action: "Plan tool-change inspection", repair: "8 min", window: "Next 30 min micro-stop", label: "Advisory inspection within 30–45 min" },
+        bearing: { action: "Inspect bearing and lubrication", repair: "22 min", window: "Controlled maintenance hold", label: "High likelihood of stoppage within 10–20 min" },
+        overheat: { action: "Cool drive and inspect thermal path", repair: "14 min", window: "Immediate controlled pause", label: "Thermal shutdown risk within 8–15 min" },
+        jam: { action: "Clear conveyor and check obstruction", repair: "12 min", window: "Immediate controlled pause", label: "Conveyor interruption risk within 5–12 min" }
+      }[state.fault] || { action: "Inspect the weakest component", repair: "15 min", window: "Next safe window", label: "Maintenance attention advised" };
+      let probability = Math.min(98, Math.max(4, Math.round(metrics.risk * .9 + (100 - maintenance.weakest.value) * .34)));
+      if (state.fault === "normal") probability = Math.min(14, Math.max(4, probability));
+      if (state.fault === "tool") probability = Math.max(28, probability);
+      if (state.fault === "bearing" || state.fault === "overheat") probability = Math.max(72, probability);
+      if (state.fault === "jam") probability = Math.max(84, probability);
+      let label = profile.label;
+      let detail = "The current sensor fusion pattern keeps " + maintenance.weakest.name + " at " + maintenance.weakest.value + "% simulated health.";
+      if (!state.running) {
+        probability = 100;
+        label = "Line is currently on safety hold";
+        detail = "The twin has paused the simulated line. An operator must inspect and approve the restart.";
+      } else if (d.level === "WARNING") {
+        detail = "Early deviation is led by " + causes[0].label.toLowerCase() + "; the continuous demo line remains at the selected target speed.";
+      } else if (d.level === "REJECT") {
+        detail = "Critical simulated pattern is led by " + causes[0].label.toLowerCase() + "; containment, a red buzzer alert and a human-approved maintenance action are recommended.";
+      }
+      const severity = probability < 25 ? "good" : probability < 60 ? "warn" : "bad";
+      return { probability, label, detail, action: profile.action, repair: profile.repair, window: profile.window, severity, causes, maintenance };
+    }
+    function setTwinNode(nodeId, textId, severity, text) {
+      const node = $(nodeId);
+      node.className = "twin-node" + (severity === "warn" ? " advisory" : severity === "bad" ? " critical" : "");
+      $(textId).textContent = text;
+    }
+    function updateDowntimePrediction() {
+      const prediction = downtimeSnapshot();
+      const color = prediction.severity === "good" ? "var(--teal)" : prediction.severity === "warn" ? "var(--amber)" : "var(--red)";
+      const label = prediction.severity === "good" ? "STABLE RUN" : prediction.severity === "warn" ? "SERVICE ADVISED" : "STOP RISK HIGH";
+      $("downtimePill").className = "risk-chip " + prediction.severity;
+      $("downtimePill").textContent = label;
+      $("downtimeProbability").textContent = String(prediction.probability).padStart(2, "0") + "%";
+      $("stopOrb").style.setProperty("--risk", prediction.probability + "%");
+      $("stopOrb").style.background = "conic-gradient(" + color + " " + prediction.probability + "%, #193749 0)";
+      $("downtimeForecast").textContent = prediction.label;
+      $("downtimeDetail").textContent = prediction.detail;
+      setTwinNode("nodeDrive", "nodeDriveText", prediction.maintenance.drive < 76 ? prediction.maintenance.drive < 52 ? "bad" : "warn" : "good", prediction.maintenance.drive + "% health");
+      setTwinNode("nodeBelt", "nodeBeltText", state.fault === "jam" ? "bad" : state.selectedDecision.level === "WARNING" ? "warn" : "good", state.running ? Math.round(state.effectiveSpeed) + "% speed" : "safety hold");
+      setTwinNode("nodeSense", "nodeSenseText", prediction.causes[0].value >= 60 ? "bad" : prediction.causes[0].value >= 30 ? "warn" : "good", prediction.causes[0].value >= 30 ? "drift found" : "signals live");
+      setTwinNode("nodeAi", "nodeAiText", prediction.severity, prediction.probability + "% stop risk");
+      setTwinNode("nodeAct", "nodeActText", !state.running ? "bad" : prediction.severity, !state.running ? "hold active" : prediction.severity === "bad" ? "route / alert" : "ready");
+      $("causeList").innerHTML = prediction.causes.slice(0, 4).map((cause, index) => {
+        const status = cause.value >= 60 ? "critical" : cause.value >= 30 ? "advisory" : "normal";
+        const meter = cause.value < 30 ? "low" : cause.value < 60 ? "medium" : "high";
+        return '<div class="cause-row"><span class="cause-rank">' + (index + 1) + '</span><div><b>' + cause.label + '</b><span>' + cause.detail + '</span></div><output>' + cause.value + '% ' + meter + '</output></div>';
+      }).join("");
+      $("repairAction").textContent = prediction.action;
+      $("repairTime").textContent = prediction.repair;
+      $("maintenanceWindow").textContent = prediction.window;
+      $("ackState").textContent = state.alertAcknowledged ? "Acknowledged" : "Pending";
+      const orderText = state.workOrderCreated ? "WO-SIM-" + String(state.batchNumber).padStart(2, "0") + " created · operator review required" : prediction.probability >= 25 ? "Action recommended · work order not yet created" : "No work order required · monitor only";
+      $("workOrderStatus").textContent = orderText;
+      $("ackAlertButton").textContent = state.alertAcknowledged ? "Alert acknowledged" : "Acknowledge alert";
+      $("ackAlertButton").classList.toggle("active", state.alertAcknowledged);
+      $("workOrderButton").textContent = state.workOrderCreated ? "Work order created" : "Create maintenance work order";
+      $("workOrderButton").classList.toggle("active", state.workOrderCreated);
+    }
+    function setBar(id, value, color) {
+      const bar = $(id);
+      bar.style.width = value + "%";
+      bar.style.background = color;
+    }
+    function updateOperationalIntelligence() {
+      const metrics = operationalSnapshot();
+      const maintenance = maintenanceSnapshot();
+      const riskClass = metrics.risk < 30 ? "good" : metrics.risk < 60 ? "warn" : "bad";
+      const riskLabel = metrics.risk < 30 ? "LOW RISK" : metrics.risk < 60 ? "ADVISORY" : "CRITICAL";
+      $("oeeReadout").textContent = metrics.oee + "%";
+      $("oeeRing").style.setProperty("--oee", metrics.oee + "%");
+      $("availabilityReadout").textContent = metrics.availability + "%";
+      $("performanceReadout").textContent = metrics.performance + "%";
+      $("qualityReadout").textContent = metrics.quality + "%";
+      setBar("availabilityBar", metrics.availability, healthColor(metrics.availability));
+      setBar("performanceBar", metrics.performance, healthColor(metrics.performance));
+      setBar("qualityBar", metrics.quality, healthColor(metrics.quality));
+      $("batchReadout").textContent = batchId();
+      $("anomalyReadout").textContent = metrics.risk + " / 100";
+      $("riskPill").className = "risk-chip " + riskClass;
+      $("riskPill").textContent = riskLabel;
+      const d = state.selectedDecision;
+      $("ribbonQuality").textContent = d.level;
+      $("ribbonRisk").textContent = metrics.risk + " / 100";
+      $("ribbonSpeed").textContent = Math.round(state.effectiveSpeed) + "%";
+      $("railQuality").textContent = d.level;
+      $("railOee").textContent = metrics.oee + "%";
+      $("railRisk").textContent = downtimeSnapshot().probability + "%";
+      $("railBatch").textContent = batchId();
+      if (d.level === "GOOD") {
+        $("forecastReadout").textContent = "5/5 likely to pass";
+        $("forecastDetail").textContent = "Healthy sensor fusion predicts a stable short-run output.";
+      } else if (d.level === "WARNING") {
+        $("forecastReadout").textContent = "3 pass · 2 review likely";
+        $("forecastDetail").textContent = "Autopilot is controlling speed while the advisory pattern is tracked.";
+      } else {
+        $("forecastReadout").textContent = "Quality containment active";
+        $("forecastDetail").textContent = "Risky packets are expected to be routed through the automatic reject path.";
+      }
+      $("driveHealthReadout").textContent = maintenance.drive + "%";
+      $("bearingHealthReadout").textContent = maintenance.bearing + "%";
+      $("thermalHealthReadout").textContent = maintenance.thermal + "%";
+      setBar("driveHealthBar", maintenance.drive, healthColor(maintenance.drive));
+      setBar("bearingHealthBar", maintenance.bearing, healthColor(maintenance.bearing));
+      setBar("thermalHealthBar", maintenance.thermal, healthColor(maintenance.thermal));
+      $("inspectionTitle").textContent = maintenance.title;
+      $("inspectionDetail").textContent = maintenance.detail;
+      $("maintenanceCallout").style.borderColor = healthColor(maintenance.weakest.value);
+      updateDowntimePrediction();
+      drawAnomalyChart();
+    }
+    function drawAnomalyChart() {
+      if (!anomalyCanvas || !anomalyCtx) return;
+      const rect = anomalyCanvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(260, rect.width);
+      const height = Math.max(120, rect.height);
+      if (anomalyCanvas.width !== Math.round(width * dpr) || anomalyCanvas.height !== Math.round(height * dpr)) {
+        anomalyCanvas.width = Math.round(width * dpr);
+        anomalyCanvas.height = Math.round(height * dpr);
+      }
+      anomalyCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      anomalyCtx.clearRect(0, 0, width, height);
+      const pad = { left: 30, right: 12, top: 13, bottom: 20 };
+      const plotW = width - pad.left - pad.right;
+      const plotH = height - pad.top - pad.bottom;
+      const values = state.anomalyHistory.length ? state.anomalyHistory.map(item => item.value) : [0, 0];
+      const y = value => pad.top + plotH - (value / 100) * plotH;
+      [0, 30, 60, 100].forEach(value => {
+        anomalyCtx.save();
+        anomalyCtx.strokeStyle = value === 60 ? "rgba(255,102,102,.3)" : value === 30 ? "rgba(255,209,102,.24)" : "rgba(255,211,143,.12)";
+        anomalyCtx.setLineDash(value === 0 || value === 100 ? [] : [4, 4]);
+        anomalyCtx.beginPath();
+        anomalyCtx.moveTo(pad.left, y(value));
+        anomalyCtx.lineTo(width - pad.right, y(value));
+        anomalyCtx.stroke();
+        anomalyCtx.setLineDash([]);
+        anomalyCtx.fillStyle = "#b9a27f";
+        anomalyCtx.font = "10px Arial";
+        anomalyCtx.fillText(String(value), 4, y(value) + 3);
+        anomalyCtx.restore();
+      });
+      const point = (value, index) => ({
+        x: pad.left + (values.length === 1 ? 0 : index / (values.length - 1)) * plotW,
+        y: y(value)
+      });
+      const points = values.map(point);
+      const latest = values[values.length - 1];
+      const color = latest < 30 ? "#d9ff61" : latest < 60 ? "#ffd166" : "#ff6666";
+      anomalyCtx.beginPath();
+      points.forEach((item, index) => index ? anomalyCtx.lineTo(item.x, item.y) : anomalyCtx.moveTo(item.x, item.y));
+      anomalyCtx.lineTo(points[points.length - 1].x, pad.top + plotH);
+      anomalyCtx.lineTo(points[0].x, pad.top + plotH);
+      anomalyCtx.closePath();
+      const fill = anomalyCtx.createLinearGradient(0, pad.top, 0, pad.top + plotH);
+      fill.addColorStop(0, color + "58");
+      fill.addColorStop(1, color + "02");
+      anomalyCtx.fillStyle = fill;
+      anomalyCtx.fill();
+      anomalyCtx.beginPath();
+      points.forEach((item, index) => index ? anomalyCtx.lineTo(item.x, item.y) : anomalyCtx.moveTo(item.x, item.y));
+      anomalyCtx.strokeStyle = color;
+      anomalyCtx.lineWidth = 2.2;
+      anomalyCtx.lineJoin = "round";
+      anomalyCtx.lineCap = "round";
+      anomalyCtx.stroke();
+      const last = points[points.length - 1];
+      anomalyCtx.beginPath();
+      anomalyCtx.arc(last.x, last.y, 4.2, 0, Math.PI * 2);
+      anomalyCtx.fillStyle = color;
+      anomalyCtx.fill();
+      anomalyCtx.strokeStyle = "#e8fbff";
+      anomalyCtx.lineWidth = 1.5;
+      anomalyCtx.stroke();
+    }
+    function clearAlarmTimer() {
+      if (state.alarm.timer) {
+        window.clearInterval(state.alarm.timer);
+        state.alarm.timer = null;
+      }
+    }
+    function updateAlarmUi() {
+      const alarm = state.alarm;
+      const panel = $("alarmPanel");
+      const critical = alarm.critical && !alarm.muted;
+      panel.classList.toggle("critical", critical);
+      panel.classList.toggle("muted", alarm.muted);
+      if (!alarm.armed) {
+        $("alarmStatus").textContent = alarm.critical ? "RED ALERT · ARM SOUND" : "QUIET · GOOD";
+        $("alarmDetail").textContent = alarm.critical ? "Tap any control once to enable the browser buzzer." : "No buzzer during healthy production.";
+        $("alarmButton").textContent = "Arm buzzer";
+        return;
+      }
+      if (alarm.muted) {
+        $("alarmStatus").textContent = alarm.critical ? "RED ALERT · MUTED" : "BUZZER MUTED";
+        $("alarmDetail").textContent = "Visual alert stays on; sound is muted.";
+        $("alarmButton").textContent = "Enable buzzer";
+        return;
+      }
+      if (alarm.critical) {
+        $("alarmStatus").textContent = "RED ALERT · BUZZER ON";
+        $("alarmDetail").textContent = "High-frequency 1.5–2.1 kHz simulated alarm active.";
+        $("alarmButton").textContent = "Mute buzzer";
+        return;
+      }
+      $("alarmStatus").textContent = "QUIET · GOOD";
+      $("alarmDetail").textContent = "Good and warning states remain silent.";
+      $("alarmButton").textContent = "Mute buzzer";
+    }
+    function playAlarmPulse() {
+      const alarm = state.alarm;
+      const audio = alarm.audioContext;
+      if (!alarm.armed || alarm.muted || !alarm.critical || !audio || audio.state !== "running") return;
+      const start = audio.currentTime;
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = "square";
+      oscillator.frequency.setValueAtTime(1500, start);
+      oscillator.frequency.exponentialRampToValueAtTime(2100, start + .10);
+      gain.gain.setValueAtTime(.0001, start);
+      gain.gain.exponentialRampToValueAtTime(.045, start + .015);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + .15);
+      oscillator.connect(gain).connect(audio.destination);
+      oscillator.start(start);
+      oscillator.stop(start + .16);
+    }
+    function scheduleAlarm() {
+      clearAlarmTimer();
+      const alarm = state.alarm;
+      if (!alarm.armed || alarm.muted || !alarm.critical) return;
+      playAlarmPulse();
+      alarm.timer = window.setInterval(playAlarmPulse, 340);
+    }
+    async function armAlarm() {
+      const Engine = window.AudioContext || window.webkitAudioContext;
+      if (!Engine) {
+        updateAlarmUi();
+        return;
+      }
+      try {
+        state.alarm.audioContext = state.alarm.audioContext || new Engine();
+        if (state.alarm.audioContext.state === "suspended") await state.alarm.audioContext.resume();
+        state.alarm.armed = state.alarm.audioContext.state === "running";
+      } catch {
+        state.alarm.armed = false;
+      }
+      scheduleAlarm();
+      updateAlarmUi();
+    }
+    function setCriticalAlarm(active) {
+      state.alarm.critical = Boolean(active);
+      scheduleAlarm();
+      updateAlarmUi();
+    }
+    function toggleAlarm() {
+      if (!state.alarm.armed) {
+        void armAlarm();
+        return;
+      }
+      state.alarm.muted = !state.alarm.muted;
+      scheduleAlarm();
+      updateAlarmUi();
+    }
+    function applyFault(name, manual = true) {
+      state.fault = name;
+      if (manual) state.autopilot = false;
+      document.querySelectorAll(".fault").forEach(button => button.classList.toggle("active", button.dataset.fault === name));
+      $("autopilotButton").textContent = "Autopilot: " + (state.autopilot ? "ON" : "OFF");
+      const profile = profiles[name];
+      const label = name === "normal" ? "Healthy process restored" : profile.title + " injected";
+      addEvent(label + ". AI controller is evaluating the process.", name === "tool" ? "warning" : name === "normal" ? "normal" : "reject");
+      updateSensorModel(true);
+    }
+    function updateSensorModel(forceEvent = false) {
+      const base = profiles[state.fault].sensors;
+      const speedFactor = state.effectiveSpeed / 100;
+      state.sensors = {
+        rpm: Math.round(base.rpm * (state.fault === "normal" ? 1 : Math.max(.67, speedFactor)) + signedNoise(13)),
+        vibration: Math.max(.05, base.vibration + signedNoise(.05)),
+        temperature: Math.max(20, base.temperature + signedNoise(1.2)),
+        current: Math.max(.12, base.current + signedNoise(.045))
+      };
+      const decision = evaluateDecision();
+      const changed = decision.level !== state.selectedDecision.level;
+      state.selectedDecision = decision;
+      setCriticalAlarm(decision.level === "REJECT");
+      const anomaly = Math.min(100, Math.round(decision.scores.vibration * .40 + decision.scores.temperature * .25 + decision.scores.current * .20 + decision.scores.rpm * .15));
+      state.anomalyHistory.push({ value: anomaly, level: decision.level });
+      if (state.anomalyHistory.length > 34) state.anomalyHistory.shift();
+      updateReadouts();
+      updateOperationalIntelligence();
+      if (forceEvent || changed) addEvent("AI decision: " + decision.level + " — " + decision.action, decision.level === "GOOD" ? "normal" : decision.level === "WARNING" ? "warning" : "reject");
+    }
+    function evaluateDecision() {
+      const s = state.sensors;
+      const vibScore = Math.min(100, Math.round(Math.max(0, s.vibration - .18) / 1.55 * 100));
+      const tempScore = Math.min(100, Math.round(Math.max(0, s.temperature - 39) / 50 * 100));
+      const currentScore = Math.min(100, Math.round(Math.max(0, s.current - .70) / .78 * 100));
+      const rpmScore = Math.min(100, Math.round(Math.abs(s.rpm - 1450) / 360 * 100));
+      const scores = { vibration: vibScore, temperature: tempScore, current: currentScore, rpm: rpmScore };
+      const top = Object.entries(scores).sort((a,b) => b[1] - a[1])[0];
+      let level = "GOOD", confidence = Math.min(99, Math.max(91, 96 - Math.round(top[1] / 13))), action = "Conveyor runs at target speed", reason = "All four sensor signals are inside the normal operating envelope.";
+      if (top[1] >= 32 || state.fault === "tool") {
+        level = "WARNING"; confidence = Math.min(96, Math.max(82, 91 - Math.round(top[1] / 10)));
+        action = "Continue monitored flow; inspect " + top[0] + " trend";
+        reason = "Early process deviation is led by " + top[0] + ". The continuous demo line remains at the selected target speed.";
+      }
+      if (top[1] >= 62 || state.fault === "bearing" || state.fault === "overheat") {
+        level = "REJECT"; confidence = Math.min(98, Math.max(86, 95 - Math.round(top[1] / 18)));
+        action = "Divert affected part; trigger critical alert";
+        reason = "High defect-risk pattern detected. " + top[0] + " is outside the learned healthy range; the continuous demo flow keeps running.";
+      }
+      return { level, confidence, action, reason, scores };
+    }
+    function setEffectiveSpeed() {
+      let target = state.manualSpeed;
+      if (!state.running) target = 0;
+      state.effectiveSpeed += (target - state.effectiveSpeed) * .08;
+      if (Math.abs(state.effectiveSpeed - target) < .2) state.effectiveSpeed = target;
+    }
+    function updateReadouts() {
+      const s = state.sensors, d = state.selectedDecision;
+      $("rpmReadout").textContent = s.rpm;
+      $("vibrationReadout").textContent = s.vibration.toFixed(2) + " g";
+      $("temperatureReadout").textContent = s.temperature.toFixed(1) + "°C";
+      $("currentReadout").textContent = s.current.toFixed(2) + " A";
+      $("rpmState").textContent = d.level === "GOOD" ? "normal speed" : "speed adjusted";
+      $("vibrationState").textContent = d.scores.vibration < 30 ? "inside limit" : "deviation detected";
+      $("temperatureState").textContent = d.scores.temperature < 30 ? "inside limit" : "thermal rise";
+      $("currentState").textContent = d.scores.current < 30 ? "stable load" : "load variation";
+      $("decisionTitle").textContent = d.level + " · " + (d.level === "GOOD" ? "release part" : d.level === "WARNING" ? "slow & inspect" : "auto divert");
+      $("decisionAction").textContent = d.action;
+      $("decisionReason").textContent = d.reason;
+      $("confidenceReadout").textContent = d.confidence + "%";
+      $("confidenceMeter").style.width = d.confidence + "%";
+      const color = d.level === "GOOD" ? "var(--teal)" : d.level === "WARNING" ? "var(--amber)" : "var(--red)";
+      $("confidenceMeter").style.background = color;
+      $("decisionBox").style.borderColor = color;
+      $("headStatus").style.color = d.level === "GOOD" ? "#b9ffdc" : d.level === "WARNING" ? "#ffe0a8" : "#ffb7bd";
+      $("headStatus").style.borderColor = d.level === "GOOD" ? "rgba(72,214,147,.32)" : d.level === "WARNING" ? "rgba(255,189,89,.34)" : "rgba(255,105,116,.37)";
+      $("headStatus").style.background = d.level === "GOOD" ? "rgba(72,214,147,.10)" : d.level === "WARNING" ? "rgba(255,189,89,.10)" : "rgba(255,105,116,.11)";
+      $("headStatus").querySelector("span").textContent = "AUTO MODE · " + d.level;
+      $("heroTitle").textContent = d.level === "GOOD" ? "Motor, conveyor and AI inspection are running automatically" : d.level === "WARNING" ? "Autopilot has detected an early quality deviation" : "Autopilot is diverting high-risk production automatically";
+      $("heroText").textContent = d.reason;
+      renderFeatures(d.scores);
+    }
+    function renderFeatures(scores) {
+      const display = [
+        ["Vibration impact", scores.vibration],
+        ["Temperature impact", scores.temperature],
+        ["Current impact", scores.current],
+        ["RPM stability", scores.rpm]
+      ];
+      $("featureList").innerHTML = display.map(([name, score]) => {
+      const color = score < 30 ? "#d9ff61" : score < 60 ? "#ffd166" : "#ff6666";
+        return '<div class="feature"><label>' + name + '</label><div class="track"><i style="width:' + Math.max(8,score) + '%;background:' + color + '"></i></div><output>' + score + '% impact</output></div>';
+      }).join("");
+    }
+    function spawnPart() {
+      const decision = state.selectedDecision;
+      let quality = decision.level;
+      if (decision.level === "WARNING" && rand() > .58) quality = "GOOD";
+      if (decision.level === "REJECT" && rand() > .88) quality = "WARNING";
+      state.parts.push({ id: state.nextPacketId++, x: 190, y: 250, quality, scanned: false, diverted: false, done: false, hue: rand() > .5 ? "#ffd166" : "#ff9b45", scanPulse: 0 });
+    }
+    function partDecision(part) {
+      part.scanned = true;
+      part.scanPulse = 1;
+      part.scannedAt = timeText();
+      part.readingSnapshot = { ...state.sensors };
+      if (part.quality === "REJECT") {
+        addEvent("Packet PKT-" + String(part.id).padStart(3, "0") + " classified REJECT; diverter armed.", "reject");
+      } else if (part.quality === "WARNING") {
+        addEvent("Packet PKT-" + String(part.id).padStart(3, "0") + " classified WARNING; released with inspection flag.", "warning");
+      }
+    }
+    function updateParts(dt) {
+      if (!state.running) return;
+      const velocity = (state.effectiveSpeed / 100) * .126 * dt;
+      const hasRejectNear = state.parts.some(part => part.quality === "REJECT" && part.x > 672 && part.x < 792 && !part.done);
+      state.currentDiverter += ((hasRejectNear ? 1 : 0) - state.currentDiverter) * .11;
+      state.parts.forEach(part => {
+        if (part.done) return;
+        part.x += velocity;
+        if (!part.scanned && part.x > 556) partDecision(part);
+        if (part.scanPulse > 0) part.scanPulse = Math.max(0, part.scanPulse - dt / 500);
+        if (part.quality === "REJECT" && part.x > 745) {
+          part.diverted = true;
+          part.y += velocity * 1.3;
+          part.x += velocity * .16;
+        }
+        if ((!part.diverted && part.x > 930) || (part.diverted && part.y > 420)) {
+          part.done = true;
+          state.total++;
+          if (part.quality === "REJECT") {
+            state.rejected++;
+            state.consecutiveRejects++;
+          } else if (part.quality === "WARNING") {
+            state.warnings++;
+            state.consecutiveRejects = 0;
+          } else {
+            state.passed++;
+            state.consecutiveRejects = 0;
+          }
+          recordPacket(part);
+        }
+      });
+      state.parts = state.parts.filter(part => !part.done);
+      if (state.consecutiveRejects >= 3 && !state.continuousAlertNotified) {
+        state.continuousAlertNotified = true;
+        addEvent("Continuous demo mode is containing repeated rejects while the simulated conveyor keeps running. Manual safety hold remains available.", "warning");
+      }
+    }
+    function roundedRect(context, x, y, w, h, radius) {
+      const r = Math.min(radius, w/2, h/2);
+      context.beginPath(); context.moveTo(x+r,y); context.arcTo(x+w,y,x+w,y+h,r); context.arcTo(x+w,y+h,x,y+h,r); context.arcTo(x,y+h,x,y,r); context.arcTo(x,y,x+w,y,r); context.closePath();
+    }
+    function drawGear(x, y, radius, angle, color) {
+      ctx.save(); ctx.translate(x,y); ctx.rotate(angle); ctx.strokeStyle = color; ctx.lineWidth = 3;
+      for (let i=0;i<8;i++){ ctx.save(); ctx.rotate(i*Math.PI/4); ctx.beginPath(); ctx.moveTo(radius*.62,0); ctx.lineTo(radius*1.05,0); ctx.stroke(); ctx.restore(); }
+      ctx.beginPath(); ctx.arc(0,0,radius*.63,0,Math.PI*2); ctx.stroke(); ctx.beginPath(); ctx.arc(0,0,radius*.2,0,Math.PI*2); ctx.fillStyle=color;ctx.fill();ctx.restore();
+    }
+    function drawGate(x, title, color, active) {
+      ctx.save();
+      ctx.strokeStyle = active ? color : "#29546b"; ctx.lineWidth = 4; ctx.shadowColor = active ? color : "transparent"; ctx.shadowBlur = active ? 13 : 0;
+      ctx.beginPath(); ctx.moveTo(x,205);ctx.lineTo(x,110);ctx.lineTo(x+54,110);ctx.lineTo(x+54,205);ctx.stroke();
+      ctx.shadowBlur = 0; ctx.fillStyle = active ? color : "#718da0"; ctx.font="700 12px Arial";ctx.fillText(title,x-2,96);
+      ctx.fillStyle = active ? color+"30" : "transparent"; if(active)ctx.fillRect(x+2,115,50,87);
+      ctx.restore();
+    }
+    function drawPart(part) {
+      const color = part.quality === "GOOD" ? "#84b4ff" : part.quality === "WARNING" ? "#ffbd59" : "#ff6974";
+      ctx.save();ctx.translate(part.x,part.y);ctx.shadowColor=color;ctx.shadowBlur=part.scanned?12:0;
+      roundedRect(ctx,-17,-13,34,26,5);ctx.fillStyle=color;ctx.fill();ctx.shadowBlur=0;
+      roundedRect(ctx,-12,-8,24,16,3);ctx.fillStyle="rgba(7,23,35,.5)";ctx.fill();
+      ctx.fillStyle="#effbff";ctx.font="700 9px Arial";ctx.textAlign="center";ctx.fillText(part.quality==="GOOD"?"OK":part.quality==="WARNING"?"!":"X",0,3);ctx.textAlign="left";
+      if (part.scanPulse > 0){ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,20+part.scanPulse*15,0,Math.PI*2);ctx.stroke();}
+      ctx.restore();
+    }
+    function drawFactory(now) {
+      const dpr = window.devicePixelRatio || 1, rect = canvas.getBoundingClientRect();
+      const width = Math.max(620, rect.width), height = Math.max(335, rect.height);
+      if(canvas.width !== Math.round(width*dpr) || canvas.height !== Math.round(height*dpr)){canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);}
+      ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,width,height);
+      const scaleX=width/1000, scaleY=height/500; ctx.save();ctx.scale(scaleX,scaleY);
+      // Factory background grid
+      ctx.fillStyle="#06131f";ctx.fillRect(0,0,1000,500);
+      ctx.strokeStyle="rgba(113,169,195,.06)";ctx.lineWidth=1;for(let x=0;x<1000;x+=50){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,500);ctx.stroke();}for(let y=50;y<500;y+=50){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(1000,y);ctx.stroke();}
+      // Floor
+      ctx.fillStyle="#071a28";ctx.fillRect(0,315,1000,185);ctx.strokeStyle="#1a465f";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,316);ctx.lineTo(1000,316);ctx.stroke();
+      // Motor housing / gear / shaft
+      roundedRect(ctx,48,172,140,138,16);ctx.fillStyle="#15384d";ctx.fill();ctx.strokeStyle="#4b7890";ctx.lineWidth=2;ctx.stroke();
+      roundedRect(ctx,74,193,72,88,9);ctx.fillStyle="#0b2638";ctx.fill();ctx.strokeStyle="#315d74";ctx.stroke();
+      const spin = now*.004*(state.effectiveSpeed/100);
+      drawGear(110,237,35,spin,"#5ce4ca");
+      ctx.strokeStyle="#5d9dc2";ctx.lineWidth=11;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(170,237);ctx.lineTo(241,237);ctx.stroke();ctx.lineCap="butt";
+      ctx.fillStyle="#9ac6dc";ctx.font="700 13px Arial";ctx.fillText("SERVO MOTOR",68,337);ctx.fillStyle="#6f98ad";ctx.font="11px Arial";ctx.fillText(state.running ? "DRIVE ACTIVE" : "SAFETY HOLD",79,355);
+      // Conveyor
+      roundedRect(ctx,205,224,655,93,24);ctx.fillStyle="#143347";ctx.fill();ctx.strokeStyle="#3f718b";ctx.lineWidth=2;ctx.stroke();
+      roundedRect(ctx,226,244,610,48,13);ctx.fillStyle="#0a1c2a";ctx.fill();
+      // Rolling belt lines
+      const beltShift=(now*.10*(state.effectiveSpeed/100))%34;ctx.strokeStyle="#31536a";ctx.lineWidth=2;
+      for(let x=232-beltShift;x<842;x+=34){ctx.beginPath();ctx.moveTo(x,247);ctx.lineTo(x+18,289);ctx.stroke();}
+      [237,824].forEach((x,i)=>{ctx.save();ctx.translate(x,268);ctx.rotate(spin*(i?1:-1));ctx.fillStyle="#214b63";ctx.beginPath();ctx.arc(0,0,25,0,Math.PI*2);ctx.fill();drawGear(0,0,18,0,"#6e9ebb");ctx.restore();});
+      ctx.fillStyle="#78a5ba";ctx.font="700 12px Arial";ctx.fillText("SMART CONVEYOR",452,350);
+      // Sensor gates
+      drawGate(360,"RPM", "#73a9ff", true);
+      drawGate(500,"VIB", state.selectedDecision.level==="GOOD"?"#5ce4ca":"#ffbd59", true);
+      drawGate(612,"TEMP", state.sensors.temperature>70?"#ff6974":"#5ce4ca", true);
+      // AI vision unit
+      roundedRect(ctx,664,72,106,64,8);ctx.fillStyle="#102d42";ctx.fill();ctx.strokeStyle="#4c89b1";ctx.lineWidth=2;ctx.stroke();ctx.fillStyle="#5ce4ca";ctx.beginPath();ctx.arc(717,102,12,0,Math.PI*2);ctx.fill();ctx.fillStyle="#d8eff8";ctx.font="700 11px Arial";ctx.fillText("AI INSPECTOR",677,151);
+      ctx.strokeStyle=state.selectedDecision.level==="REJECT"?"#ff6974":"#5ce4ca";ctx.lineWidth=2;ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(717,136);ctx.lineTo(717,222);ctx.stroke();ctx.setLineDash([]);
+      // Diverter and reject bin
+      const diverterAngle = -0.18 + state.currentDiverter*.85;ctx.save();ctx.translate(756,298);ctx.rotate(diverterAngle);ctx.fillStyle=state.currentDiverter>.4?"#ff6974":"#4d788f";roundedRect(ctx,-7,-43,14,84,4);ctx.fill();ctx.restore();
+      roundedRect(ctx,810,367,115,77,9);ctx.fillStyle="#321e2c";ctx.fill();ctx.strokeStyle="#b65665";ctx.lineWidth=2;ctx.stroke();ctx.fillStyle="#ff9da4";ctx.font="700 11px Arial";ctx.fillText("REJECT BIN",831,410);
+      // Quality release bin
+      roundedRect(ctx,908,234,68,83,9);ctx.fillStyle="#143a32";ctx.fill();ctx.strokeStyle="#4fbc8b";ctx.stroke();ctx.fillStyle="#9bffd3";ctx.font="700 11px Arial";ctx.fillText("PASS",927,283);
+      state.parts.forEach(drawPart);
+      // Sensor beams / live tags
+      ctx.strokeStyle="rgba(92,228,202,.46)";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(503,208);ctx.lineTo(503,310);ctx.stroke();
+      ctx.fillStyle="#86adbe";ctx.font="11px Arial";ctx.fillText("AUTONOMOUS QUALITY CELL",406,430);
+      ctx.fillStyle=state.selectedDecision.level==="GOOD"?"#5ce4ca":state.selectedDecision.level==="WARNING"?"#ffbd59":"#ff6974";ctx.font="800 13px Arial";ctx.fillText("AI: "+state.selectedDecision.level,660,183);
+      // Live downtime forecast overlay inside the running digital twin
+      const forecast = downtimeSnapshot();
+      const forecastColor = forecast.severity === "good" ? "#5ce4ca" : forecast.severity === "warn" ? "#ffbd59" : "#ff6974";
+      roundedRect(ctx,26,20,266,62,10);ctx.fillStyle="rgba(5,20,31,.88)";ctx.fill();ctx.strokeStyle=forecastColor;ctx.lineWidth=1.4;ctx.stroke();
+      ctx.fillStyle="#8db2c3";ctx.font="800 10px Arial";ctx.fillText("SMART DOWNTIME PREDICTOR",39,41);
+      ctx.fillStyle=forecastColor;ctx.font="800 19px Arial";ctx.fillText(String(forecast.probability).padStart(2,"0")+"%",39,66);
+      ctx.fillStyle="#d4e9f2";ctx.font="700 11px Arial";ctx.fillText(state.running?forecast.label:"SAFETY HOLD ACTIVE",89,64);
+      ctx.restore();
+    }
+    function drawHexCell(x, y, radius, fill, stroke) {
+      ctx.beginPath();
+      for (let index = 0; index < 6; index++) {
+        const angle = Math.PI / 3 * index - Math.PI / 6;
+        const px = x + Math.cos(angle) * radius;
+        const py = y + Math.sin(angle) * radius;
+        if (index) ctx.lineTo(px, py); else ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+    function drawEnergyLink(x1, y1, x2, y2, color, width) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    function cellPartPosition(part) {
+      let t;
+      if (part.diverted) {
+        t = Math.min(1, Math.max(0, (part.y - 250) / 170));
+        return { x: 742 + 158 * t, y: 294 + 120 * t, angle: .56 };
+      }
+      if (part.x < 645) {
+        t = Math.max(0, (part.x - 190) / 455);
+        return { x: 126 + 620 * t, y: 278 + Math.sin(t * Math.PI * 3) * 2.5, angle: 0 };
+      }
+      t = Math.min(1, (part.x - 645) / 285);
+      const targetY = part.quality === "GOOD" ? 145 : part.quality === "WARNING" ? 238 : 362;
+      return { x: 746 + 160 * t, y: 278 + (targetY - 278) * Math.min(1, t * 1.22), angle: 0 };
+    }
+    function drawPart(part) {
+      const point = cellPartPosition(part);
+      const color = part.quality === "GOOD" ? "#d9ff61" : part.quality === "WARNING" ? "#ffd166" : "#ff6666";
+      ctx.save();
+      ctx.translate(point.x, point.y);
+      ctx.rotate(point.angle);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = part.scanned ? 17 : 7;
+      roundedRect(ctx, -16, -12, 32, 24, 5);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      roundedRect(ctx, -11, -7, 22, 14, 3);
+      ctx.fillStyle = "#21170e";
+      ctx.fill();
+      ctx.fillStyle = "#fff4df";
+      ctx.font = "800 8px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(part.quality === "GOOD" ? "OK" : part.quality === "WARNING" ? "!" : "X", 0, 3);
+      ctx.textAlign = "left";
+      if (part.scanPulse > 0) {
+        ctx.strokeStyle = "#fff4df";
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.arc(0, 0, 20 + part.scanPulse * 17, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    function drawFactory(now) {
+      drawOperationsDeck(now);
+      return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(620, rect.width);
+      const height = Math.max(335, rect.height);
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      const scaleX = width / 1000;
+      const scaleY = height / 500;
+      const spin = now * .0036 * (state.effectiveSpeed / 100);
+      const forecast = downtimeSnapshot();
+      const riskColor = forecast.severity === "good" ? "#d9ff61" : forecast.severity === "warn" ? "#ffd166" : "#ff6666";
+      ctx.save();
+      ctx.scale(scaleX, scaleY);
+
+      ctx.fillStyle = "#100d09";
+      ctx.fillRect(0, 0, 1000, 500);
+      ctx.fillStyle = "#171108";
+      ctx.fillRect(0, 350, 1000, 150);
+      ctx.strokeStyle = "rgba(255,209,130,.055)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= 1000; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 500);
+        ctx.stroke();
+      }
+      for (let y = 30; y <= 500; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(1000, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(255,132,38,.22)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, 350);
+      ctx.lineTo(1000, 350);
+      ctx.stroke();
+
+      if (state.advancedMode) {
+        [124, 160, 198].forEach(radius => {
+          ctx.beginPath();
+          ctx.arc(510, 255, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = radius === 160 ? "rgba(217,255,97,.08)" : "rgba(255,132,38,.07)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+        ctx.save();
+        ctx.setLineDash([4, 7]);
+        ctx.strokeStyle = "rgba(217,255,97,.26)";
+        ctx.beginPath();
+        ctx.moveTo(355, 78);
+        ctx.lineTo(510, 255);
+        ctx.lineTo(702, 85);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      roundedRect(ctx, 58, 146, 146, 196, 18);
+      ctx.fillStyle = "#25180d";
+      ctx.fill();
+      ctx.strokeStyle = "#ff8426";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      roundedRect(ctx, 78, 176, 106, 121, 12);
+      ctx.fillStyle = "#120d08";
+      ctx.fill();
+      ctx.strokeStyle = "#6b411c";
+      ctx.stroke();
+      for (let row = 0; row < 3; row++) {
+        for (let col = 0; col < 3; col++) {
+          roundedRect(ctx, 91 + col * 26, 190 + row * 26, 18, 16, 3);
+          ctx.fillStyle = (row + col) % 2 ? "#ffd166" : "#e96831";
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = "#ffdb9f";
+      ctx.font = "800 12px Arial";
+      ctx.fillText("INFEED", 89, 319);
+      ctx.fillStyle = "#b89e7b";
+      ctx.font = "10px Arial";
+      ctx.fillText("MAGAZINE", 81, 335);
+      ctx.fillStyle = state.running ? "#a7ee57" : "#ff6666";
+      ctx.beginPath();
+      ctx.arc(174, 322, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.save();
+      ctx.strokeStyle = "#5b3819";
+      ctx.lineWidth = 24;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(183, 294);
+      ctx.lineTo(415, 294);
+      ctx.arc(510, 255, 95, 2.72, .36, true);
+      ctx.lineTo(746, 284);
+      ctx.stroke();
+      ctx.strokeStyle = state.running ? "rgba(255,209,102,.82)" : "rgba(255,102,102,.48)";
+      ctx.lineWidth = 5;
+      ctx.shadowColor = state.running ? "#ffd166" : "#ff6666";
+      ctx.shadowBlur = 9;
+      ctx.beginPath();
+      ctx.moveTo(183, 294);
+      ctx.lineTo(415, 294);
+      ctx.arc(510, 255, 95, 2.72, .36, true);
+      ctx.lineTo(746, 284);
+      ctx.stroke();
+      ctx.restore();
+      ctx.save();
+      ctx.setLineDash([7, 8]);
+      ctx.strokeStyle = "rgba(217,255,97,.72)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(744, 294);
+      ctx.lineTo(898, 184);
+      ctx.moveTo(744, 294);
+      ctx.lineTo(898, 276);
+      ctx.moveTo(744, 306);
+      ctx.lineTo(898, 418);
+      ctx.stroke();
+      ctx.restore();
+
+      drawHexCell(510, 255, 119, "#21150b", "#ff8426");
+      ctx.beginPath();
+      ctx.arc(510, 255, 96, 0, Math.PI * 2);
+      ctx.fillStyle = "#130e08";
+      ctx.fill();
+      ctx.strokeStyle = "#ffd166";
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(510, 255);
+      ctx.rotate(spin);
+      for (let index = 0; index < 8; index++) {
+        ctx.rotate(Math.PI / 4);
+        ctx.strokeStyle = "#ff8426";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(24, 0);
+        ctx.lineTo(76, 0);
+        ctx.stroke();
+        ctx.fillStyle = "#d9ff61";
+        ctx.beginPath();
+        ctx.arc(76, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(510, 255, 39, 0, Math.PI * 2);
+      ctx.fillStyle = "#2c1b0d";
+      ctx.fill();
+      ctx.strokeStyle = "#d9ff61";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = "#fff0d6";
+      ctx.font = "800 11px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText("ROTARY", 510, 252);
+      ctx.fillText("SCAN", 510, 266);
+      ctx.textAlign = "left";
+      const sensorPods = [
+        { x: 414, y: 170, label: "RPM", color: "#ff8426" },
+        { x: 522, y: 130, label: "VIB", color: state.selectedDecision.level === "GOOD" ? "#d9ff61" : "#ffd166" },
+        { x: 615, y: 182, label: "TEMP", color: state.sensors.temperature > 70 ? "#ff6666" : "#d9ff61" },
+        { x: 620, y: 322, label: "AMP", color: state.sensors.current > 1.1 ? "#ff6666" : "#ffd166" }
+      ];
+      sensorPods.forEach(pod => {
+        drawHexCell(pod.x, pod.y, 25, "#25170c", pod.color);
+        ctx.fillStyle = pod.color;
+        ctx.font = "800 9px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText(pod.label, pod.x, pod.y + 3);
+        ctx.textAlign = "left";
+      });
+
+      roundedRect(ctx, 663, 88, 148, 126, 14);
+      ctx.fillStyle = "#2a190d";
+      ctx.fill();
+      ctx.strokeStyle = "#ff8426";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      roundedRect(ctx, 681, 109, 112, 47, 7);
+      ctx.fillStyle = "#0d0a07";
+      ctx.fill();
+      ctx.strokeStyle = riskColor;
+      ctx.stroke();
+      const bars = [16, 29, 11, 36, 23];
+      bars.forEach((bar, index) => {
+        ctx.fillStyle = index === 3 ? riskColor : "#d9ff61";
+        ctx.fillRect(694 + index * 17, 147 - bar, 9, bar);
+      });
+      ctx.fillStyle = "#ffdca5";
+      ctx.font = "800 11px Arial";
+      ctx.fillText("EDGE AI CORE", 684, 181);
+      ctx.fillStyle = riskColor;
+      ctx.font = "800 9px Arial";
+      ctx.fillText("RISK " + String(forecast.probability).padStart(2, "0") + "%", 684, 198);
+      drawEnergyLink(736, 214, 736, 274, riskColor, 2);
+
+      roundedRect(ctx, 820, 126, 145, 316, 17);
+      ctx.fillStyle = "#21150c";
+      ctx.fill();
+      ctx.strokeStyle = "#ff8426";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      const bins = [
+        { y: 150, h: 62, label: "PASS", sub: "release", color: "#d9ff61" },
+        { y: 239, h: 62, label: "REVIEW", sub: "flag", color: "#ffd166" },
+        { y: 328, h: 86, label: "REJECT", sub: "contain", color: "#ff6666" }
+      ];
+      bins.forEach(bin => {
+        roundedRect(ctx, 838, bin.y, 108, bin.h, 8);
+        ctx.fillStyle = "#130e08";
+        ctx.fill();
+        ctx.strokeStyle = bin.color;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.fillStyle = bin.color;
+        ctx.font = "800 11px Arial";
+        ctx.fillText(bin.label, 852, bin.y + 28);
+        ctx.fillStyle = "#bca486";
+        ctx.font = "9px Arial";
+        ctx.fillText(bin.sub, 852, bin.y + 45);
+      });
+      ctx.save();
+      ctx.translate(776, 276);
+      ctx.rotate(-.45 + state.currentDiverter * 1.02);
+      ctx.strokeStyle = state.currentDiverter > .4 ? "#ff6666" : "#ffd166";
+      ctx.lineWidth = 10;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(58, 0);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = "#ffdca5";
+      ctx.font = "800 10px Arial";
+      ctx.fillText("ROBOTIC SORT RACK", 824, 112);
+
+      state.parts.forEach(drawPart);
+
+      if (state.advancedMode) {
+        roundedRect(ctx, 24, 20, 304, 76, 11);
+        ctx.fillStyle = "rgba(24,16,8,.9)";
+        ctx.fill();
+        ctx.strokeStyle = "#d9ff61";
+        ctx.lineWidth = 1.3;
+        ctx.stroke();
+        ctx.fillStyle = "#d9ff61";
+        ctx.font = "800 10px Arial";
+        ctx.fillText("ADVANCED SENSOR FUSION", 39, 42);
+        const tags = [
+          "RPM " + state.sensors.rpm,
+          "VIB " + state.sensors.vibration.toFixed(2) + "g",
+          "TMP " + state.sensors.temperature.toFixed(0) + "C",
+          "AMP " + state.sensors.current.toFixed(2) + "A"
+        ];
+        tags.forEach((tag, index) => {
+          const x = 39 + (index % 2) * 137;
+          const y = 62 + Math.floor(index / 2) * 19;
+          ctx.fillStyle = index === 1 && state.selectedDecision.level !== "GOOD" ? "#ffd166" : "#ffdca5";
+          ctx.font = "800 9px Arial";
+          ctx.fillText(tag, x, y);
+        });
+      } else {
+        ctx.fillStyle = "#ffdca5";
+        ctx.font = "800 11px Arial";
+        ctx.fillText("AUTOMATED FLOW ACTIVE", 30, 45);
+      }
+
+      roundedRect(ctx, 700, 20, 268, 60, 10);
+      ctx.fillStyle = "rgba(24,16,8,.9)";
+      ctx.fill();
+      ctx.strokeStyle = riskColor;
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      ctx.fillStyle = "#d4bd99";
+      ctx.font = "800 9px Arial";
+      ctx.fillText("PREDICTIVE DOWNTIME WINDOW", 715, 42);
+      ctx.fillStyle = riskColor;
+      ctx.font = "800 20px Arial";
+      ctx.fillText(String(forecast.probability).padStart(2, "0") + "%", 715, 68);
+      ctx.fillStyle = "#ffe7be";
+      ctx.font = "700 10px Arial";
+      ctx.fillText(state.running ? forecast.label : "SAFETY HOLD ACTIVE", 764, 66);
+      if (!state.running) {
+        ctx.fillStyle = "rgba(255,102,102,.14)";
+        ctx.fillRect(0, 0, 1000, 500);
+        ctx.fillStyle = "#fff0dc";
+        ctx.font = "900 28px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("SAFETY HOLD", 510, 420);
+        ctx.textAlign = "left";
+      }
+      ctx.fillStyle = "#bca486";
+      ctx.font = "10px Arial";
+      ctx.fillText("AUTONOMOUS QUALITY ISLAND  •  ROTARY INSPECTION  •  EDGE AI  •  ROBOTIC SORTING", 242, 476);
+      ctx.restore();
+    }
+    function drawOperationsDeck(now) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      const width = Math.max(620, rect.width);
+      const height = Math.max(335, rect.height);
+      if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      const scaleX = width / 1000;
+      const scaleY = height / 500;
+      const spin = now * .004 * (state.effectiveSpeed / 100);
+      const forecast = downtimeSnapshot();
+      const riskColor = forecast.severity === "good" ? "#baf064" : forecast.severity === "warn" ? "#ffe08a" : "#ff6875";
+      const lineColor = state.running ? "#baf064" : "#ff6875";
+      ctx.save();
+      ctx.scale(scaleX, scaleY);
+
+      ctx.fillStyle = "#0c130f";
+      ctx.fillRect(0, 0, 1000, 500);
+      ctx.fillStyle = "#101b14";
+      ctx.fillRect(0, 386, 1000, 114);
+      ctx.strokeStyle = "rgba(220,248,192,.055)";
+      ctx.lineWidth = 1;
+      for (let x = 0; x <= 1000; x += 40) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 500); ctx.stroke();
+      }
+      for (let y = 0; y <= 500; y += 40) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1000, y); ctx.stroke();
+      }
+      ctx.strokeStyle = "rgba(186,240,100,.24)";
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, 386); ctx.lineTo(1000, 386); ctx.stroke();
+
+      roundedRect(ctx, 22, 18, 316, 50, 7);
+      ctx.fillStyle = "rgba(14,24,17,.92)"; ctx.fill();
+      ctx.strokeStyle = "rgba(186,240,100,.42)"; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = "#cfe7ab"; ctx.font = "800 9px Arial"; ctx.fillText("CELL-A // LIVE PROCESS MAP", 38, 39);
+      ctx.fillStyle = lineColor; ctx.font = "800 16px Arial"; ctx.fillText(state.running ? "AUTONOMOUS FLOW" : "SAFETY HOLD", 38, 58);
+      ctx.fillStyle = "#9eae9a"; ctx.font = "700 9px Arial"; ctx.fillText("RPM · VIBRATION · THERMAL · CURRENT", 174, 58);
+
+      roundedRect(ctx, 690, 18, 286, 50, 7);
+      ctx.fillStyle = "rgba(14,24,17,.92)"; ctx.fill();
+      ctx.strokeStyle = riskColor; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = "#b5c7ac"; ctx.font = "800 9px Arial"; ctx.fillText("PREDICTIVE INTERRUPTION WINDOW", 706, 39);
+      ctx.fillStyle = riskColor; ctx.font = "900 17px Arial"; ctx.fillText(String(forecast.probability).padStart(2, "0") + "%", 706, 58);
+      ctx.fillStyle = "#edf4df"; ctx.font = "700 10px Arial"; ctx.fillText(state.running ? forecast.label : "OPERATOR INSPECTION REQUIRED", 757, 57);
+
+      // Stage 01: drive and infeed pack
+      roundedRect(ctx, 32, 150, 164, 204, 11);
+      ctx.fillStyle = "#14241a"; ctx.fill();
+      ctx.strokeStyle = "#ffc15a"; ctx.lineWidth = 2; ctx.stroke();
+      roundedRect(ctx, 57, 191, 114, 102, 8);
+      ctx.fillStyle = "#0a110d"; ctx.fill();
+      ctx.strokeStyle = "#48604d"; ctx.lineWidth = 1.3; ctx.stroke();
+      ctx.save(); ctx.translate(114, 241); ctx.rotate(spin); drawGear(0, 0, 28, 0, "#ffc15a"); ctx.restore();
+      ctx.fillStyle = "#fff0c2"; ctx.font = "800 11px Arial"; ctx.fillText("DRIVE PACK", 64, 321);
+      ctx.fillStyle = state.running ? "#baf064" : "#ff6875"; ctx.beginPath(); ctx.arc(165, 319, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#9cab98"; ctx.font = "9px Arial"; ctx.fillText(state.running ? "TORQUE LIVE" : "HOLD ACTIVE", 64, 337);
+
+      // Main conveyor bus
+      roundedRect(ctx, 158, 249, 622, 58, 17);
+      ctx.fillStyle = "#1d3022"; ctx.fill();
+      ctx.strokeStyle = "#587457"; ctx.lineWidth = 2; ctx.stroke();
+      roundedRect(ctx, 178, 264, 575, 28, 9);
+      ctx.fillStyle = "#0b140e"; ctx.fill();
+      const beltShift = (now * .12 * (state.effectiveSpeed / 100)) % 28;
+      ctx.strokeStyle = state.running ? "rgba(186,240,100,.38)" : "rgba(255,104,117,.34)";
+      ctx.lineWidth = 1.6;
+      for (let x = 182 - beltShift; x < 748; x += 28) {
+        ctx.beginPath(); ctx.moveTo(x, 266); ctx.lineTo(x + 13, 290); ctx.stroke();
+      }
+      [185, 748].forEach((x, index) => {
+        ctx.save(); ctx.translate(x, 278); ctx.rotate(spin * (index ? 1 : -1));
+        ctx.fillStyle = "#314833"; ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI * 2); ctx.fill();
+        drawGear(0, 0, 12, 0, "#baf064"); ctx.restore();
+      });
+
+      // Stage 02: sensor tunnel
+      roundedRect(ctx, 244, 120, 272, 244, 12);
+      ctx.fillStyle = "rgba(18,35,24,.88)"; ctx.fill();
+      ctx.strokeStyle = "#baf064"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "#d7edb1"; ctx.font = "800 11px Arial"; ctx.fillText("SENSOR TUNNEL", 266, 149);
+      const sensorUnits = [
+        { x: 278, label: "RPM", value: state.sensors.rpm, color: "#ffc15a" },
+        { x: 356, label: "VIB", value: state.sensors.vibration.toFixed(2) + "g", color: state.selectedDecision.level === "GOOD" ? "#baf064" : "#ffe08a" },
+        { x: 434, label: "TEMP", value: state.sensors.temperature.toFixed(0) + "C", color: state.sensors.temperature > 70 ? "#ff6875" : "#baf064" }
+      ];
+      sensorUnits.forEach(unit => {
+        roundedRect(ctx, unit.x, 169, 59, 56, 6);
+        ctx.fillStyle = "#0b150e"; ctx.fill(); ctx.strokeStyle = unit.color; ctx.lineWidth = 1.25; ctx.stroke();
+        ctx.fillStyle = unit.color; ctx.font = "800 8px Arial"; ctx.fillText(unit.label, unit.x + 9, 190);
+        ctx.fillStyle = "#eff6df"; ctx.font = "800 10px Arial"; ctx.fillText(String(unit.value), unit.x + 9, 210);
+        ctx.strokeStyle = unit.color + "66"; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(unit.x + 29, 226); ctx.lineTo(unit.x + 29, 249); ctx.stroke(); ctx.setLineDash([]);
+      });
+      roundedRect(ctx, 313, 321, 134, 25, 5);
+      ctx.fillStyle = "rgba(186,240,100,.09)"; ctx.fill(); ctx.strokeStyle = "rgba(186,240,100,.28)"; ctx.stroke();
+      ctx.fillStyle = "#cfe7ab"; ctx.font = "800 8px Arial"; ctx.fillText("FUSION STREAM ARMED", 326, 337);
+
+      // Stage 03: model decision node
+      roundedRect(ctx, 548, 136, 170, 185, 12);
+      ctx.fillStyle = "#172819"; ctx.fill();
+      ctx.strokeStyle = riskColor; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "#e9f4d0"; ctx.font = "800 11px Arial"; ctx.fillText("EDGE MODEL", 569, 165);
+      ctx.fillStyle = "#9cad96"; ctx.font = "9px Arial"; ctx.fillText("RANDOM FOREST REPLICA", 569, 181);
+      roundedRect(ctx, 570, 198, 123, 58, 7);
+      ctx.fillStyle = "#0b150e"; ctx.fill(); ctx.strokeStyle = riskColor; ctx.lineWidth = 1.2; ctx.stroke();
+      [17, 31, 24, 40, 28].forEach((bar, index) => {
+        ctx.fillStyle = index === 3 ? riskColor : "#baf064";
+        ctx.fillRect(583 + index * 20, 244 - bar, 10, bar);
+      });
+      ctx.fillStyle = riskColor; ctx.font = "900 11px Arial"; ctx.fillText(state.selectedDecision.level + " · " + String(forecast.probability).padStart(2, "0") + "% RISK", 570, 283);
+      ctx.fillStyle = "#a8b9a2"; ctx.font = "9px Arial"; ctx.fillText("AUTO DECISION + OPERATOR SAFE MODE", 570, 300);
+
+      // Stage 04: outcome router
+      roundedRect(ctx, 800, 92, 164, 333, 12);
+      ctx.fillStyle = "#142218"; ctx.fill(); ctx.strokeStyle = "#ffc15a"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.fillStyle = "#fff0c2"; ctx.font = "800 10px Arial"; ctx.fillText("QUALITY OUTCOME RACK", 816, 118);
+      const outcomes = [
+        { y: 132, h: 58, label: "PASS", note: "release", color: "#baf064" },
+        { y: 221, h: 58, label: "REVIEW", note: "flag", color: "#ffe08a" },
+        { y: 310, h: 78, label: "REJECT", note: "contain", color: "#ff6875" }
+      ];
+      outcomes.forEach(item => {
+        roundedRect(ctx, 820, item.y, 123, item.h, 7);
+        ctx.fillStyle = "#0b140e"; ctx.fill(); ctx.strokeStyle = item.color; ctx.lineWidth = 1.25; ctx.stroke();
+        ctx.fillStyle = item.color; ctx.font = "900 11px Arial"; ctx.fillText(item.label, 836, item.y + 25);
+        ctx.fillStyle = "#aab7a2"; ctx.font = "9px Arial"; ctx.fillText(item.note, 836, item.y + 43);
+      });
+      ctx.save(); ctx.translate(760, 278); ctx.rotate(-.72 + state.currentDiverter * 1.36);
+      ctx.strokeStyle = state.currentDiverter > .4 ? "#ff6875" : "#ffc15a"; ctx.lineWidth = 9; ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(60, 0); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.setLineDash([5, 7]); ctx.strokeStyle = "rgba(186,240,100,.55)"; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(760, 278); ctx.lineTo(820, 160); ctx.moveTo(760, 278); ctx.lineTo(820, 250); ctx.moveTo(760, 278); ctx.lineTo(820, 350); ctx.stroke(); ctx.restore();
+
+      state.parts.forEach(drawPart);
+
+      roundedRect(ctx, 31, 410, 366, 54, 7);
+      ctx.fillStyle = "rgba(13,22,15,.9)"; ctx.fill(); ctx.strokeStyle = "rgba(202,235,173,.2)"; ctx.stroke();
+      ctx.fillStyle = "#b8c6ae"; ctx.font = "800 8px Arial"; ctx.fillText("LIVE FUSION", 48, 431);
+      const fusionTags = ["RPM " + state.sensors.rpm, "VIB " + state.sensors.vibration.toFixed(2) + "g", "TMP " + state.sensors.temperature.toFixed(0) + "C", "AMP " + state.sensors.current.toFixed(2) + "A"];
+      fusionTags.forEach((tag, index) => { ctx.fillStyle = index === 1 && state.selectedDecision.level !== "GOOD" ? "#ffe08a" : "#eaf5d4"; ctx.font = "800 9px Arial"; ctx.fillText(tag, 48 + index * 83, 451); });
+      ctx.fillStyle = "#99a995"; ctx.font = "9px Arial"; ctx.fillText("DRIVE → SENSORS → MODEL → QUALITY ROUTE // SIMULATED DIGITAL TWIN", 475, 450);
+
+      if (!state.running) {
+        ctx.fillStyle = "rgba(255,104,117,.13)"; ctx.fillRect(0, 0, 1000, 500);
+        ctx.fillStyle = "#fff2ec"; ctx.font = "900 27px Arial"; ctx.textAlign = "center"; ctx.fillText("SAFETY HOLD · HUMAN INSPECTION REQUIRED", 500, 476); ctx.textAlign = "left";
+      }
+      ctx.restore();
+    }
+    function updateAutopilot(now) {
+      if (!state.autopilot) return;
+      const elapsed = (now - state.sequenceStart) / 1000;
+      const cycle = elapsed % 45;
+      let desired = "normal";
+      if (cycle > 10 && cycle <= 19) desired = "tool";
+      else if (cycle > 27 && cycle <= 36) desired = "bearing";
+      if (desired !== state.fault) applyFault(desired, false);
+    }
+    function updateStats() {
+      const passRate = state.total ? Math.round(state.passed / state.total * 100) : 100;
+      $("speedReadout").textContent=Math.round(state.effectiveSpeed)+"%";
+      $("totalReadout").textContent=state.total;
+      $("goodReadout").textContent=state.passed;
+      $("warningReadout").textContent=state.warnings;
+      $("defectReadout").textContent=state.rejected;
+      $("passRateReadout").textContent=passRate+"%";
+      $("lineState").textContent=state.running?"RUNNING":"SAFETY HOLD";
+      $("lineState").style.color=state.running?"var(--teal)":"var(--red)";
+      $("runButton").textContent=state.running?"Pause Line":"Resume Line";
+    }
+    function loop(now) {
+      const dt=Math.min(65, now-(state.lastFrame||now)); state.lastFrame=now;
+      updateAutopilot(now); setEffectiveSpeed();
+      if (now-state.lastSensor>750){updateSensorModel(false);state.lastSensor=now;}
+      const spawnInterval=1300/(Math.max(.35,state.effectiveSpeed/100));
+      if(state.running && now-state.lastSpawn>spawnInterval){spawnPart();state.lastSpawn=now;}
+      updateParts(dt); updateStats(); drawFactory(now); requestAnimationFrame(loop);
+    }
+    function toggleRun() { state.running=!state.running; updateOperationalIntelligence(); addEvent(state.running?"Line resumed by operator.":"Line paused by operator.",state.running?"normal":"warning"); }
+    function toggleAutopilot() { state.autopilot=!state.autopilot; $("autopilotButton").textContent="Autopilot: "+(state.autopilot?"ON":"OFF"); if(state.autopilot){state.sequenceStart=performance.now();addEvent("Autopilot demonstration sequence enabled.");}else addEvent("Autopilot disabled; manual condition control is active.","warning"); }
+    function resetCycle() {
+      state.parts=[];
+      state.total=0;
+      state.passed=0;
+      state.rejected=0;
+      state.warnings=0;
+      state.packetLog=[];
+      state.nextPacketId=1;
+      state.batchNumber++;
+      state.anomalyHistory=[];
+      state.safetyHolds=0;
+      state.consecutiveRejects=0;
+      state.continuousAlertNotified=false;
+      state.alertAcknowledged=false;
+      state.workOrderCreated=false;
+      state.backend.ready=false;
+      state.backend.error="";
+      state.running=true;
+      state.autopilot=true;
+      state.sequenceStart=performance.now();
+      renderPacketLedger();
+      applyFault("normal",false);
+      addEvent("Production cycle reset. Autopilot restarted.");
+      void startBackendBatch();
+    }
+    function safetyHold() { if (state.running) state.safetyHolds++; state.running=false; updateOperationalIntelligence(); addEvent("Safety hold applied manually. Motor and conveyor are paused.","reject"); }
+    function acknowledgeDowntimeAlert() {
+      state.alertAcknowledged = true;
+      updateDowntimePrediction();
+      addEvent("Downtime prediction acknowledged by operator. The twin will continue monitoring.", "warning");
+    }
+    function createMaintenanceWorkOrder() {
+      const prediction = downtimeSnapshot();
+      const alreadyCreated = state.workOrderCreated;
+      state.workOrderCreated = true;
+      state.alertAcknowledged = true;
+      updateDowntimePrediction();
+      addEvent("Maintenance work order created in simulation: " + prediction.action + ". Human approval remains required.", prediction.severity === "bad" ? "reject" : "warning");
+      if (!alreadyCreated) void persistWorkOrder(prediction);
+    }
+    function exportLog() {
+      const rows=["batch_id,packet_id,time,rpm,vibration_g,temperature_c,current_a,ai_result,auto_action"];
+      state.packetLog.slice().reverse().forEach(packet => rows.push([
+        batchId(),
+        "PKT-" + String(packet.id).padStart(3, "0"),
+        packet.at,
+        packet.rpm,
+        packet.vibration.toFixed(3),
+        packet.temperature.toFixed(2),
+        packet.current.toFixed(3),
+        packet.result,
+        '"' + packet.action.replace(/"/g,'""') + '"'
+      ].join(",")));
+      const blob=new Blob([rows.join("\\n")],{type:"text/csv"});
+      const link=document.createElement("a");
+      link.href=URL.createObjectURL(blob);
+      link.download="autoforge_packet_inspection_ledger.csv";
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+    function openBatchReport() {
+      const metrics = operationalSnapshot();
+      const maintenance = maintenanceSnapshot();
+      $("reportBatch").textContent = batchId();
+      $("reportOee").textContent = metrics.oee + "%";
+      $("reportTotal").textContent = state.total;
+      $("reportGood").textContent = state.passed;
+      $("reportRejected").textContent = state.rejected;
+      $("reportRisk").textContent = metrics.risk + " / 100";
+      $("reportNote").textContent = "Current simulation summary: " + maintenance.title + ". " + maintenance.detail + " OEE combines availability, performance and good-packet quality for this live simulated batch.";
+      $("batchModal").classList.add("show");
+    }
+    function toggleAdvancedMode() {
+      state.advancedMode = !state.advancedMode;
+      $("app").classList.toggle("advanced-active", state.advancedMode);
+      $("advancedButton").classList.toggle("active", state.advancedMode);
+      $("advancedButton").textContent = "Advanced Mode: " + (state.advancedMode ? "ON" : "OFF");
+      addEvent(state.advancedMode ? "Advanced sensor-fusion overlay enabled." : "Advanced sensor-fusion overlay hidden.", state.advancedMode ? "normal" : "warning");
+    }
+    function togglePresentation(){
+      $("app").classList.toggle("presentation");
+      const active=$("app").classList.contains("presentation");
+      $("presentationButton").textContent=active?"Exit Presentation":"Presentation Mode";
+      if(active && document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(()=>{});
+      if(!active && document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+    }
+    document.addEventListener("pointerdown", () => { if (!state.alarm.armed) void armAlarm(); }, { once: true });
+    $("runButton").addEventListener("click",toggleRun);
+    $("autopilotButton").addEventListener("click",toggleAutopilot);
+    $("resetButton").addEventListener("click",resetCycle);
+    $("safetyButton").addEventListener("click",safetyHold);
+    $("alarmButton").addEventListener("click",toggleAlarm);
+    $("speedSlider").addEventListener("input",event=>{$("speedOutput").textContent=event.target.value+"%";state.manualSpeed=Number(event.target.value);if(state.autopilot)toggleAutopilot();});
+    $("faultGrid").addEventListener("click",event=>{const button=event.target.closest("[data-fault]");if(button)applyFault(button.dataset.fault,true);});
+    $("downloadButton").addEventListener("click",exportLog);
+    $("batchReportButton").addEventListener("click",openBatchReport);
+    $("advancedButton").addEventListener("click",toggleAdvancedMode);
+    $("syncButton").addEventListener("click",syncBackendData);
+    $("ackAlertButton").addEventListener("click",acknowledgeDowntimeAlert);
+    $("workOrderButton").addEventListener("click",createMaintenanceWorkOrder);
+    $("vivaButton").addEventListener("click",()=>$("vivaModal").classList.add("show"));
+    $("closeViva").addEventListener("click",()=>$("vivaModal").classList.remove("show"));
+    $("vivaModal").addEventListener("click",event=>{if(event.target.id==="vivaModal")$("vivaModal").classList.remove("show");});
+    $("closeBatch").addEventListener("click",()=>$("batchModal").classList.remove("show"));
+    $("batchModal").addEventListener("click",event=>{if(event.target.id==="batchModal")$("batchModal").classList.remove("show");});
+    $("presentationButton").addEventListener("click",togglePresentation);
+    window.addEventListener("resize",()=>{drawFactory(performance.now());drawAnomalyChart();});
+    addEvent("AutoForge Sentinel started. Motor drive and conveyor are live.");
+    addEvent("AI controller is monitoring four process variables.");
+    renderPacketLedger();
+    updateSensorModel(true);
+    void initializeBackend();
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
