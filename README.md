@@ -60,5 +60,28 @@ The main objective of AutoForge-Sentinel is to demonstrate how **Artificial Inte
 <img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/cdbaed6a-fac0-478d-a00c-7e3f77b87c8a" />
 
 
+### 🌟 The Future of Smart Manufacturing
+
+**From Reactive Maintenance to Predictive Intelligence.**
+
+AutoForge-Sentinel represents a step toward **Industry 4.0**, where connected systems, intelligent analytics, and real-time monitoring transform traditional manufacturing into smarter, safer, and more efficient production environments.
+
+**⚡ Detect Early. Predict Smart. Act Faster. Manufacture Better.**
+
+*Engineering meets Intelligence — Building the Future of Autonomous Manufacturing.*
+
+### 🔗 Explore the Project
+
+🚀 **Live Demo:** https://autoforge-sentinel-mayank-20260930.mayankrajput244251.chatgpt.site/
+
+💻 **Source Code:** Available in this GitHub repository.
+
+### 👨‍💻 Developed By
+**Mayank Kumar**  
+B.Tech Mechanical Engineering  
+ABES Engineering College, Ghaziabad
+
+*Designed to explore the intersection of Mechanical Engineering, Artificial Intelligence, Industrial Automation, and Digital Twin Technology.*
+
 
 
