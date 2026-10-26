@@ -20,4 +20,45 @@ AutoForge-Sentinel is developed as a practical engineering project to explore th
 
 
 
+## ⚙️ How AutoForge-Sentinel Works
+
+**AutoForge-Sentinel — AI-Powered Industrial Quality Prediction & Monitoring**
+
+AutoForge-Sentinel demonstrates an intelligent industrial workflow that combines conveyor simulation, sensor monitoring, AI-based risk prediction, and automated response mechanisms to support smarter manufacturing.
+
+### 🔄 Five-Step Working Process
+
+**1. Drive Motor**  
+The motor powers the conveyor system and initiates the industrial production process.
+
+**2. Move Part**  
+The conveyor transports components through the production line for inspection and monitoring.
+
+**3. Read Sensors**  
+Sensors collect operational data to monitor component movement and identify abnormal conditions.
+
+**4. Predict Risk**  
+The AI-based prediction module analyzes available data to identify potential quality issues, operational risks, and possible downtime.
+
+**5. Take Action**  
+The system presents alerts and supports timely corrective action to improve production reliability and reduce potential defects.
+
+### 🚀 Key Highlights
+
+- **Smart Conveyor Simulation:** Visualizes the movement of components through an industrial workflow.
+- **Sensor-Based Monitoring:** Tracks simulated operating conditions and sensor status.
+- **Predictive Risk Analysis:** Demonstrates how data-driven intelligence can help identify potential production problems.
+- **Automated Alerts:** Highlights abnormal conditions that may require attention.
+- **Industrial Digital Twin Concept:** Represents a digital version of an industrial process for monitoring and analysis.
+- **Backend Data Logging:** Supports the recording and management of relevant system data.
+
+### 🎯 Project Objective
+
+The main objective of AutoForge-Sentinel is to demonstrate how **Artificial Intelligence, Industrial IoT, Digital Twin technology, and predictive monitoring** can work together to improve industrial quality control and manufacturing efficiency.
+
+*This project is a practical exploration of intelligent manufacturing concepts, focusing on early risk identification, improved operational visibility, and smarter industrial decision-making.*
+<img width="1024" height="572" alt="image" src="https://github.com/user-attachments/assets/cdbaed6a-fac0-478d-a00c-7e3f77b87c8a" />
+
+
+
 
